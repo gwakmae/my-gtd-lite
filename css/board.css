@@ -8,6 +8,16 @@
     max-height: 100%;
 }
 
+/* 모바일에서 칼럼 폭 제한 해제 */
+@media (max-width: 1199.98px) {
+    .board-column {
+        flex: none;
+        width: 100%;
+        min-width: unset;
+        max-width: unset;
+    }
+}
+
 .board-column.drag-over {
     background-color: #dcdfe4;
 }
