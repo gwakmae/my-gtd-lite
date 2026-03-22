@@ -4,16 +4,23 @@ class TaskNodeRenderer {
         this.cb = callbacks;
     }
 
-    render(task, opts = {}) {
-        const { hideCompleted, showHidden, selectedIds, isMultiSelectMode } = opts;
+    render(task, opts) {
+        opts = opts || {};
+        var hideCompleted = opts.hideCompleted;
+        var showHidden = opts.showHidden;
+        var selectedIds = opts.selectedIds;
+        var isMultiSelectMode = opts.isMultiSelectMode;
+
         if (hideCompleted && task.IsCompleted) return null;
         if (!showHidden && task.IsHidden) return null;
 
-        const nodeEl = document.createElement('div');
+        var self = this;
+
+        var nodeEl = document.createElement('div');
         nodeEl.className = 'task-node';
         nodeEl.dataset.taskId = task.Id;
 
-        const selfEl = document.createElement('div');
+        var selfEl = document.createElement('div');
         selfEl.className = 'task-node-self';
         selfEl.dataset.taskId = task.Id;
         selfEl.draggable = true;
@@ -27,129 +34,129 @@ class TaskNodeRenderer {
         }
 
         // Expander
-        if (task.Children.length > 0) {
-            const exp = document.createElement('span');
+        if (task.Children && task.Children.length > 0) {
+            var exp = document.createElement('span');
             exp.className = 'expander';
             exp.textContent = task.IsExpanded ? '▼' : '▶';
-            exp.addEventListener('click', (e) => {
+            exp.addEventListener('click', function(e) {
                 e.stopPropagation();
                 task.IsExpanded = !task.IsExpanded;
-                this.ds.updateExpandState(task.Id, task.IsExpanded);
-                this.cb.onRefresh();
+                self.ds.updateExpandState(task.Id, task.IsExpanded);
+                self.cb.onRefresh();
             });
             selfEl.appendChild(exp);
         } else {
-            const ph = document.createElement('span');
+            var ph = document.createElement('span');
             ph.className = 'expander-placeholder';
             selfEl.appendChild(ph);
         }
 
         // Task Card Content
-        const card = document.createElement('div');
+        var card = document.createElement('div');
         card.className = 'task-card-content';
         if (task.IsCompleted) card.classList.add('is-completed');
 
         if (!task.IsCompleted && task.DueDate) {
-            const today = new Date(); today.setHours(0, 0, 0, 0);
-            const due = new Date(task.DueDate); due.setHours(0, 0, 0, 0);
+            var today = new Date(); today.setHours(0, 0, 0, 0);
+            var due = new Date(task.DueDate); due.setHours(0, 0, 0, 0);
             if (due < today) card.classList.add('is-overdue');
             else if (due.getTime() === today.getTime()) card.classList.add('is-due-today');
         }
 
         // Checkbox
-        const checkBtn = document.createElement('button');
+        var checkBtn = document.createElement('button');
         checkBtn.className = 'task-checkbox-btn';
         checkBtn.type = 'button';
-        const checkIcon = document.createElement('span');
+        var checkIcon = document.createElement('span');
         checkIcon.className = 'task-checkbox';
         checkIcon.textContent = task.IsCompleted ? '☑' : '☐';
         checkIcon.style.fontSize = '1.1rem';
         checkBtn.appendChild(checkIcon);
-        checkBtn.addEventListener('click', (e) => {
+        checkBtn.addEventListener('click', function(e) {
             e.stopPropagation();
-            this.cb.onToggleComplete(task.Id);
+            self.cb.onToggleComplete(task.Id);
         });
         card.appendChild(checkBtn);
 
         // Title
-        const title = document.createElement('span');
+        var title = document.createElement('span');
         title.className = 'task-title';
         title.textContent = task.Title;
         card.appendChild(title);
 
         // Delete button
-        const delBtn = document.createElement('button');
+        var delBtn = document.createElement('button');
         delBtn.className = 'action-btn delete-btn';
         delBtn.innerHTML = '×';
         delBtn.title = 'Delete';
-        delBtn.addEventListener('click', (e) => {
+        delBtn.addEventListener('click', function(e) {
             e.stopPropagation();
-            this.cb.onDelete(task.Id);
+            self.cb.onDelete(task.Id);
         });
         card.appendChild(delBtn);
 
         // Double click to edit
-        card.addEventListener('dblclick', (e) => {
+        card.addEventListener('dblclick', function(e) {
             e.stopPropagation();
             e.preventDefault();
-            this.cb.onDoubleClick(task.Id);
+            self.cb.onDoubleClick(task.Id);
         });
 
         selfEl.appendChild(card);
 
         // Add child button
-        const addBtn = document.createElement('button');
+        var addBtn = document.createElement('button');
         addBtn.className = 'action-btn add-btn';
         addBtn.textContent = '+';
         addBtn.title = 'Add sub-task';
-        addBtn.addEventListener('click', (e) => {
+        addBtn.addEventListener('click', function(e) {
             e.stopPropagation();
-            this.cb.onAddChild(task.Id, nodeEl);
+            self.cb.onAddChild(task.Id, nodeEl);
         });
         selfEl.appendChild(addBtn);
 
         // Click handler
-        selfEl.addEventListener('click', (e) => {
-            this.cb.onTaskClick(task.Id, e);
+        selfEl.addEventListener('click', function(e) {
+            self.cb.onTaskClick(task.Id, e);
         });
 
         // Drag events
-        selfEl.addEventListener('dragstart', (e) => {
+        selfEl.addEventListener('dragstart', function(e) {
             e.dataTransfer.effectAllowed = 'move';
             e.dataTransfer.setData('text/plain', String(task.Id));
-            this.cb.onDragStart(task.Id, selfEl);
+            self.cb.onDragStart(task.Id, selfEl);
         });
-        selfEl.addEventListener('dragend', () => {
-            this.cb.onDragEnd();
+        selfEl.addEventListener('dragend', function() {
+            self.cb.onDragEnd();
         });
-        selfEl.addEventListener('dragover', (e) => {
+        selfEl.addEventListener('dragover', function(e) {
             e.preventDefault();
             e.stopPropagation();
-            this._handleDragOver(selfEl, task, e);
+            self._handleDragOver(selfEl, task, e);
         });
-        selfEl.addEventListener('dragleave', () => {
+        selfEl.addEventListener('dragleave', function() {
             selfEl.classList.remove('drop-above', 'drop-inside', 'drop-below', 'drop-invalid');
         });
-        selfEl.addEventListener('drop', (e) => {
+        selfEl.addEventListener('drop', function(e) {
             e.preventDefault();
             e.stopPropagation();
-            this._handleDrop(selfEl, task);
+            self._handleDrop(selfEl, task);
         });
 
         nodeEl.appendChild(selfEl);
 
         // Children
-        if (task.IsExpanded && task.Children.length > 0) {
-            const childrenEl = document.createElement('div');
+        if (task.IsExpanded && task.Children && task.Children.length > 0) {
+            var childrenEl = document.createElement('div');
             childrenEl.className = 'task-node-children';
 
-            const filteredChildren = task.Children
-                .filter(c => !(hideCompleted && c.IsCompleted))
-                .filter(c => showHidden || !c.IsHidden)
-                .sort((a, b) => a.SortOrder - b.SortOrder);
+            var filteredChildren = task.Children
+                .filter(function(c) { return !(hideCompleted && c.IsCompleted); })
+                .filter(function(c) { return showHidden || !c.IsHidden; })
+                .sort(function(a, b) { return a.SortOrder - b.SortOrder; });
 
-            for (const child of filteredChildren) {
-                const childNode = this.render(child, opts);
+            for (var i = 0; i < filteredChildren.length; i++) {
+                var childNode = this.render(filteredChildren[i], opts);
                 if (childNode) childrenEl.appendChild(childNode);
             }
             nodeEl.appendChild(childrenEl);
@@ -159,7 +166,7 @@ class TaskNodeRenderer {
     }
 
     _handleDragOver(selfEl, task, e) {
-        const draggedId = this.cb.getDraggedId();
+        var draggedId = this.cb.getDraggedId();
         if (!draggedId || draggedId === task.Id) {
             selfEl.classList.add('drop-invalid');
             return;
@@ -171,17 +178,22 @@ class TaskNodeRenderer {
 
         selfEl.classList.remove('drop-above', 'drop-inside', 'drop-below', 'drop-invalid');
 
-        const rect = selfEl.getBoundingClientRect();
-        const offsetY = e.clientY - rect.top;
-        const zone = rect.height / 3;
+        var rect = selfEl.getBoundingClientRect();
+        var offsetY = e.clientY - rect.top;
+        var height = rect.height;
 
-        if (offsetY < zone) selfEl.classList.add('drop-above');
-        else if (offsetY > rect.height - zone) selfEl.classList.add('drop-below');
-        else selfEl.classList.add('drop-inside');
+        // 모바일 친화적 비율: 위 40% = 형제(위), 가운데 20% = 자식, 아래 40% = 형제(아래)
+        if (offsetY < height * 0.4) {
+            selfEl.classList.add('drop-above');
+        } else if (offsetY > height * 0.6) {
+            selfEl.classList.add('drop-below');
+        } else {
+            selfEl.classList.add('drop-inside');
+        }
     }
 
     _handleDrop(selfEl, targetTask) {
-        let position = 'Inside';
+        var position = 'Inside';
         if (selfEl.classList.contains('drop-above')) position = 'Above';
         else if (selfEl.classList.contains('drop-below')) position = 'Below';
         else if (selfEl.classList.contains('drop-invalid')) {
@@ -194,16 +206,15 @@ class TaskNodeRenderer {
     }
 
     _isDescendant(checkId, rootId) {
-        const task = this.ds.getById(rootId);
-        if (!task) return false;
-        const desc = [];
-        const collect = (pid) => {
-            this.ds.getRawTasks().filter(t => t.ParentId === pid).forEach(c => {
+        var self = this;
+        var desc = [];
+        var collect = function(pid) {
+            self.ds.getRawTasks().filter(function(t) { return t.ParentId === pid; }).forEach(function(c) {
                 desc.push(c.Id);
                 collect(c.Id);
             });
         };
         collect(rootId);
-        return desc.includes(checkId);
+        return desc.indexOf(checkId) !== -1;
     }
 }
