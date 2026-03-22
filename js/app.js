@@ -1,3 +1,4 @@
+const app = {
 ds: null,
     undo: null,
         toast: null,
