@@ -201,6 +201,32 @@ class BoardView {
         var taskList = document.createElement('div');
         taskList.className = 'task-list';
 
+        // 칼럼 상단 드롭존 — 첫 번째 태스크 위로 드롭 가능
+        if (status && !isTodayCol && filteredTasks.length > 0) {
+            var self = this;
+            var dropTop = document.createElement('div');
+            dropTop.className = 'column-drop-top';
+            dropTop.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dropTop.classList.add('drag-over-top');
+            });
+            dropTop.addEventListener('dragleave', function() {
+                dropTop.classList.remove('drag-over-top');
+            });
+            dropTop.addEventListener('drop', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                dropTop.classList.remove('drag-over-top');
+                var ids = self.dragDrop.getIdsToMove();
+                if (ids.length > 0) {
+                    self.ds.moveTasks(ids, status, null, 0);
+                }
+                self.dragDrop.endDrag();
+            });
+            taskList.appendChild(dropTop);
+        }
+
         for (var i = 0; i < filteredTasks.length; i++) {
             var node = this.nodeRenderer.render(filteredTasks[i], {
                 hideCompleted: this.hideCompleted,
