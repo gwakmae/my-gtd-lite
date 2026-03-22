@@ -29,9 +29,28 @@ class BoardView {
             onDragEnd: function() { self.dragDrop.endDrag(); },
             onDrop: function(targetId, position) { self._handleDrop(targetId, position); },
             getDraggedId: function() { return self.dragDrop.getDraggedId(); },
-            onRefresh: function() { self.render(); }
+            onRefresh: function() { self.render(); },
+            // ★ 새 콜백: 칼럼 상단 드롭
+            onDropColumnTop: function(status) {
+                var ids = self.dragDrop.getIdsToMove();
+                if (ids.length > 0) {
+                    self.ds.moveTasks(ids, status, null, 0);
+                }
+                self.dragDrop.endDrag();
+            },
+            // ★ 새 콜백: 칼럼 빈 영역 드롭
+            onDropColumnEmpty: function(status) {
+                var ids = self.dragDrop.getIdsToMove();
+                if (ids.length > 0) {
+                    var siblings = self.ds.getTasksForStatus(status);
+                    self.ds.moveTasks(ids, status, null, siblings.length);
+                }
+                self.dragDrop.endDrag();
+            }
         });
     }
+
+    // ── 이하 모든 메서드 기존과 동일 ──
 
     render() {
         var container = document.getElementById('content-area');
@@ -172,7 +191,6 @@ class BoardView {
 
         var filteredTasks = this._filterTasks(tasks);
 
-        // Column header
         if (status === TaskStatus.Completed) {
             var headerDiv = document.createElement('div');
             headerDiv.className = 'column-header-with-action';
@@ -201,10 +219,8 @@ class BoardView {
 
         var taskList = document.createElement('div');
         taskList.className = 'task-list';
-        // 이 플래그로 column-drop-top의 drop이 처리됐는지 추적
         var topDropHandled = false;
 
-        // ── 칼럼 상단 드롭존 ──
         if (status && !isTodayCol && filteredTasks.length > 0) {
             var self = this;
             var dropTop = document.createElement('div');
@@ -223,7 +239,6 @@ class BoardView {
                 dropTop.classList.remove('drag-over-top');
                 var ids = self.dragDrop.getIdsToMove();
                 if (ids.length > 0) {
-                    // 칼럼 맨 위(형제, 정렬순서 0)로 이동
                     self.ds.moveTasks(ids, status, null, 0);
                 }
                 self.dragDrop.endDrag();
@@ -232,7 +247,6 @@ class BoardView {
             taskList.appendChild(dropTop);
         }
 
-        // ── 태스크 노드 렌더링 ──
         for (var i = 0; i < filteredTasks.length; i++) {
             var node = this.nodeRenderer.render(filteredTasks[i], {
                 hideCompleted: this.hideCompleted,
@@ -245,7 +259,6 @@ class BoardView {
 
         col.appendChild(taskList);
 
-        // ── 칼럼 빈 영역 드롭 (task-list 자체에 드롭) ──
         if (status && !isTodayCol) {
             var self = this;
             taskList.addEventListener('dragover', function(e) {
@@ -256,7 +269,6 @@ class BoardView {
                 taskList.classList.remove('drag-over-column');
             });
             taskList.addEventListener('drop', function(e) {
-                // column-drop-top에서 이미 처리했으면 무시
                 if (topDropHandled) {
                     topDropHandled = false;
                     return;
@@ -265,7 +277,6 @@ class BoardView {
                 taskList.classList.remove('drag-over-column');
                 var ids = self.dragDrop.getIdsToMove();
                 if (ids.length > 0) {
-                    // 칼럼 맨 끝(형제)으로 이동
                     var siblings = self.ds.getTasksForStatus(status);
                     self.ds.moveTasks(ids, status, null, siblings.length);
                 }
@@ -273,7 +284,6 @@ class BoardView {
             });
         }
 
-        // ── 태스크 추가 버튼 ──
         if (status && status !== TaskStatus.Completed && !isTodayCol) {
             var self = this;
             var addBtn = document.createElement('button');
@@ -434,7 +444,6 @@ class BoardView {
         });
     }
 
-    // ★★★ 핵심 수정: position(Above/Below/Inside)에 따라 parentId와 sortOrder를 올바르게 계산 ★★★
     _handleDrop(targetId, position) {
         var ids = this.dragDrop.getIdsToMove();
         if (ids.length === 0) return;
@@ -447,17 +456,13 @@ class BoardView {
         var newSortOrder;
 
         if (position === 'Inside') {
-            // 자식으로 이동: 타겟이 부모가 됨
             newParentId = target.Id;
-            // 타겟의 기존 자식 수 = 맨 끝에 추가
             var existingChildren = this.ds.getRawTasks().filter(function(t) {
                 return t.ParentId === target.Id;
             });
             newSortOrder = existingChildren.length;
         } else {
-            // Above 또는 Below: 형제로 이동 (타겟과 같은 부모)
             newParentId = target.ParentId;
-            // 타겟의 형제들 중에서 타겟의 SortOrder 기준으로 위치 결정
             var siblings = this.ds.getRawTasks().filter(function(t) {
                 return t.ParentId === target.ParentId && t.Status === target.Status;
             }).sort(function(a, b) { return a.SortOrder - b.SortOrder; });
@@ -473,7 +478,6 @@ class BoardView {
             if (position === 'Above') {
                 newSortOrder = targetIdx >= 0 ? targetIdx : 0;
             } else {
-                // Below
                 newSortOrder = targetIdx >= 0 ? targetIdx + 1 : siblings.length;
             }
         }
