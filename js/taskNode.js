@@ -9,19 +9,12 @@ class TaskNodeRenderer {
         this._isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
         this._touchState = {
-            startX: 0,
-            startY: 0,
-            offsetX: 0,
-            offsetY: 0,
-            taskId: null,
-            sourceEl: null,
-            ghostEl: null,
-            isDragging: false,
-            longPressTimer: null,
-            currentDropTarget: null,
-            currentDropPosition: null,
-            lastTouchX: 0,
-            lastTouchY: 0
+            startX: 0, startY: 0,
+            offsetX: 0, offsetY: 0,
+            taskId: null, sourceEl: null, ghostEl: null,
+            isDragging: false, longPressTimer: null,
+            currentDropTarget: null, currentDropPosition: null,
+            lastTouchX: 0, lastTouchY: 0
         };
 
         this._boundTouchMove = this._onTouchMove.bind(this);
@@ -60,7 +53,6 @@ class TaskNodeRenderer {
             }
         }
 
-        // Expander
         if (task.Children && task.Children.length > 0) {
             var exp = document.createElement('span');
             exp.className = 'expander';
@@ -78,7 +70,6 @@ class TaskNodeRenderer {
             selfEl.appendChild(ph);
         }
 
-        // Task Card Content
         var card = document.createElement('div');
         card.className = 'task-card-content';
         if (task.IsCompleted) card.classList.add('is-completed');
@@ -90,7 +81,6 @@ class TaskNodeRenderer {
             else if (due.getTime() === today.getTime()) card.classList.add('is-due-today');
         }
 
-        // Checkbox
         var checkBtn = document.createElement('button');
         checkBtn.className = 'task-checkbox-btn';
         checkBtn.type = 'button';
@@ -105,13 +95,11 @@ class TaskNodeRenderer {
         });
         card.appendChild(checkBtn);
 
-        // Title
         var title = document.createElement('span');
         title.className = 'task-title';
         title.textContent = task.Title;
         card.appendChild(title);
 
-        // Delete button
         var delBtn = document.createElement('button');
         delBtn.className = 'action-btn delete-btn';
         delBtn.innerHTML = '×';
@@ -122,7 +110,6 @@ class TaskNodeRenderer {
         });
         card.appendChild(delBtn);
 
-        // Double click to edit
         card.addEventListener('dblclick', function(e) {
             e.stopPropagation();
             e.preventDefault();
@@ -131,7 +118,6 @@ class TaskNodeRenderer {
 
         selfEl.appendChild(card);
 
-        // Add child button
         var addBtn = document.createElement('button');
         addBtn.className = 'action-btn add-btn';
         addBtn.textContent = '+';
@@ -142,14 +128,11 @@ class TaskNodeRenderer {
         });
         selfEl.appendChild(addBtn);
 
-        // Click handler
         selfEl.addEventListener('click', function(e) {
             self.cb.onTaskClick(task.Id, e);
         });
 
-        // ══════════════════════════════════
-        // 데스크탑 Drag API
-        // ══════════════════════════════════
+        // 데스크탑 Drag
         if (!this._isTouchDevice) {
             selfEl.addEventListener('dragstart', function(e) {
                 e.dataTransfer.effectAllowed = 'move';
@@ -177,14 +160,11 @@ class TaskNodeRenderer {
             });
         }
 
-        // ══════════════════════════════════
-        // 모바일 Touch 드래그
-        // ══════════════════════════════════
+        // 모바일 Touch
         if (this._isTouchDevice) {
             selfEl.addEventListener('touchstart', function(e) {
                 if (e.touches.length !== 1) return;
                 var touch = e.touches[0];
-
                 var rect = selfEl.getBoundingClientRect();
                 self._touchState.offsetX = touch.clientX - rect.left;
                 self._touchState.offsetY = touch.clientY - rect.top;
@@ -210,16 +190,13 @@ class TaskNodeRenderer {
 
         nodeEl.appendChild(selfEl);
 
-        // Children
         if (task.IsExpanded && task.Children && task.Children.length > 0) {
             var childrenEl = document.createElement('div');
             childrenEl.className = 'task-node-children';
-
             var filteredChildren = task.Children
                 .filter(function(c) { return !(hideCompleted && c.IsCompleted); })
                 .filter(function(c) { return showHidden || !c.IsHidden; })
                 .sort(function(a, b) { return a.SortOrder - b.SortOrder; });
-
             for (var i = 0; i < filteredChildren.length; i++) {
                 var childNode = this.render(filteredChildren[i], opts);
                 if (childNode) childrenEl.appendChild(childNode);
@@ -229,10 +206,6 @@ class TaskNodeRenderer {
 
         return nodeEl;
     }
-
-    // ══════════════════════════════════
-    // 모바일 Touch 핸들러
-    // ══════════════════════════════════
 
     _preventContext(e) { e.preventDefault(); }
 
@@ -253,61 +226,38 @@ class TaskNodeRenderer {
     _onTouchMove(e) {
         var ts = this._touchState;
         var touch = e.touches[0];
-
         if (!ts.isDragging) {
             var dx = Math.abs(touch.clientX - ts.startX);
             var dy = Math.abs(touch.clientY - ts.startY);
-            if (dx > 10 || dy > 10) {
-                this._cancelTouch();
-            }
+            if (dx > 10 || dy > 10) { this._cancelTouch(); }
             return;
         }
-
         e.preventDefault();
-
-        // 마지막 터치 좌표 저장 (touchend에서 사용)
         ts.lastTouchX = touch.clientX;
         ts.lastTouchY = touch.clientY;
-
         if (ts.ghostEl) {
             ts.ghostEl.style.left = (touch.clientX - ts.offsetX) + 'px';
             ts.ghostEl.style.top = (touch.clientY - ts.offsetY) + 'px';
         }
-
         if (ts.ghostEl) ts.ghostEl.style.display = 'none';
         var elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
         if (ts.ghostEl) ts.ghostEl.style.display = '';
-
         this._updateTouchDropTarget(elemBelow, touch.clientY);
     }
 
     _updateTouchDropTarget(elemBelow, clientY) {
         var ts = this._touchState;
-
         if (ts.currentDropTarget && ts.currentDropTarget !== elemBelow) {
             var prevSelf = ts.currentDropTarget.closest('.task-node-self');
-            if (prevSelf) {
-                prevSelf.classList.remove('drop-above', 'drop-below', 'drop-inside', 'drop-invalid');
-            }
+            if (prevSelf) prevSelf.classList.remove('drop-above', 'drop-below', 'drop-inside', 'drop-invalid');
             var prevTop = ts.currentDropTarget.closest('.column-drop-top');
             if (prevTop) prevTop.classList.remove('drag-over-top');
-
-            document.querySelectorAll('.drag-over-column').forEach(function(el) {
-                el.classList.remove('drag-over-column');
-            });
-
+            document.querySelectorAll('.drag-over-column').forEach(function(el) { el.classList.remove('drag-over-column'); });
             this._clearHoldTimer();
         }
-
-        if (!elemBelow) {
-            ts.currentDropTarget = null;
-            ts.currentDropPosition = null;
-            return;
-        }
-
+        if (!elemBelow) { ts.currentDropTarget = null; ts.currentDropPosition = null; return; }
         ts.currentDropTarget = elemBelow;
 
-        // ── column-drop-top ──
         var dropTopEl = elemBelow.closest('.column-drop-top');
         if (dropTopEl) {
             dropTopEl.classList.add('drag-over-top');
@@ -316,26 +266,17 @@ class TaskNodeRenderer {
             return;
         }
 
-        // ── task-node-self ──
         var taskSelfEl = elemBelow.closest('.task-node-self');
         var taskListEl = elemBelow.closest('.task-list');
-
         if (taskListEl && !taskSelfEl) {
             taskListEl.classList.add('drag-over-column');
             ts.currentDropPosition = 'column-empty';
             this._clearHoldTimer();
             return;
         }
+        document.querySelectorAll('.drag-over-column').forEach(function(el) { el.classList.remove('drag-over-column'); });
 
-        document.querySelectorAll('.drag-over-column').forEach(function(el) {
-            el.classList.remove('drag-over-column');
-        });
-
-        if (!taskSelfEl) {
-            ts.currentDropPosition = null;
-            this._clearHoldTimer();
-            return;
-        }
+        if (!taskSelfEl) { ts.currentDropPosition = null; this._clearHoldTimer(); return; }
 
         var targetTaskId = parseInt(taskSelfEl.dataset.taskId);
         if (!targetTaskId || targetTaskId === ts.taskId) {
@@ -345,7 +286,6 @@ class TaskNodeRenderer {
             this._clearHoldTimer();
             return;
         }
-
         if (this._isDescendant(targetTaskId, ts.taskId)) {
             taskSelfEl.classList.remove('drop-above', 'drop-below', 'drop-inside');
             taskSelfEl.classList.add('drop-invalid');
@@ -353,18 +293,12 @@ class TaskNodeRenderer {
             this._clearHoldTimer();
             return;
         }
-
-        if (taskSelfEl.classList.contains('drop-inside')) {
-            return;
-        }
+        if (taskSelfEl.classList.contains('drop-inside')) return;
 
         taskSelfEl.classList.remove('drop-above', 'drop-below', 'drop-inside', 'drop-invalid');
-
         var rect = taskSelfEl.getBoundingClientRect();
         var offsetY = clientY - rect.top;
-        var height = rect.height;
-
-        if (offsetY < height * 0.5) {
+        if (offsetY < rect.height * 0.5) {
             taskSelfEl.classList.add('drop-above');
             ts.currentDropPosition = 'Above';
         } else {
@@ -386,106 +320,80 @@ class TaskNodeRenderer {
         }
     }
 
+    // ★★★ 핵심 수정: column-top/column-empty를 콜백으로 처리 ★★★
     _onTouchEnd(e) {
         var ts = this._touchState;
-
         document.removeEventListener('touchmove', this._boundTouchMove);
         document.removeEventListener('touchend', this._boundTouchEnd);
-        if (ts.sourceEl) {
-            ts.sourceEl.removeEventListener('contextmenu', this._preventContext);
-        }
+        if (ts.sourceEl) ts.sourceEl.removeEventListener('contextmenu', this._preventContext);
 
-        if (!ts.isDragging) {
-            this._cancelTouch();
-            return;
-        }
+        if (!ts.isDragging) { this._cancelTouch(); return; }
 
-        // ★ 고스트 숨기고 최종 위치에서 elementFromPoint로 재확인
-        if (ts.ghostEl) {
-            ts.ghostEl.style.display = 'none';
-        }
+        // 고스트 숨기고 최종 위치 재확인
+        if (ts.ghostEl) ts.ghostEl.style.display = 'none';
         var finalElem = document.elementFromPoint(ts.lastTouchX, ts.lastTouchY);
-        if (ts.ghostEl) {
-            ts.ghostEl.remove();
-            ts.ghostEl = null;
-        }
-
-        if (ts.sourceEl) {
-            ts.sourceEl.classList.remove('is-dragging-source');
-        }
-
+        if (ts.ghostEl) { ts.ghostEl.remove(); ts.ghostEl = null; }
+        if (ts.sourceEl) ts.sourceEl.classList.remove('is-dragging-source');
         this._clearHoldTimer();
 
-        // ★ 최종 요소로 position 재결정 (단, drop-inside 상태면 유지)
         var position = ts.currentDropPosition;
 
+        // 최종 요소로 재확인
         if (finalElem) {
-            // column-drop-top 재확인
             var finalDropTop = finalElem.closest('.column-drop-top');
             if (finalDropTop) {
                 position = 'column-top';
-                ts.currentDropTarget = finalElem;
+                ts.currentDropTarget = finalDropTop;
             } else if (position !== 'Inside') {
-                // Inside(홀드 완료)가 아닌 경우에만 재판정
                 var finalTaskSelf = finalElem.closest('.task-node-self');
                 var finalTaskList = finalElem.closest('.task-list');
-
                 if (finalTaskList && !finalTaskSelf) {
                     position = 'column-empty';
-                    ts.currentDropTarget = finalElem;
+                    ts.currentDropTarget = finalTaskList;
                 } else if (finalTaskSelf) {
                     var fid = parseInt(finalTaskSelf.dataset.taskId);
                     if (fid && fid !== ts.taskId && !this._isDescendant(fid, ts.taskId)) {
                         var rect = finalTaskSelf.getBoundingClientRect();
-                        var oY = ts.lastTouchY - rect.top;
-                        position = oY < rect.height * 0.5 ? 'Above' : 'Below';
-                        ts.currentDropTarget = finalElem;
+                        position = (ts.lastTouchY - rect.top) < rect.height * 0.5 ? 'Above' : 'Below';
+                        ts.currentDropTarget = finalTaskSelf;
                     }
                 }
             }
         }
 
-        // ── column-top 드롭 ──
+        // ── column-top: 콜백으로 처리 ──
         if (position === 'column-top') {
             document.querySelectorAll('.drag-over-top').forEach(function(el) { el.classList.remove('drag-over-top'); });
             var colEl = ts.currentDropTarget ? ts.currentDropTarget.closest('.board-column') : null;
-            if (colEl && colEl.dataset.status) {
-                var ids = this._getDragIds();
-                if (ids.length > 0) {
-                    this.ds.moveTasks(ids, colEl.dataset.status, null, 0);
-                }
+            if (colEl && colEl.dataset.status && this.cb.onDropColumnTop) {
+                this.cb.onDropColumnTop(colEl.dataset.status);
+            } else {
+                this.cb.onDragEnd();
             }
-            this.cb.onDragEnd();
             this._resetTouchState();
             return;
         }
 
-        // ── column-empty 드롭 ──
+        // ── column-empty: 콜백으로 처리 ──
         if (position === 'column-empty') {
             document.querySelectorAll('.drag-over-column').forEach(function(el) { el.classList.remove('drag-over-column'); });
             var colEl = ts.currentDropTarget ? ts.currentDropTarget.closest('.board-column') : null;
-            if (colEl && colEl.dataset.status) {
-                var status = colEl.dataset.status;
-                var ids = this._getDragIds();
-                if (ids.length > 0) {
-                    var siblings = this.ds.getTasksForStatus(status);
-                    this.ds.moveTasks(ids, status, null, siblings.length);
-                }
+            if (colEl && colEl.dataset.status && this.cb.onDropColumnEmpty) {
+                this.cb.onDropColumnEmpty(colEl.dataset.status);
+            } else {
+                this.cb.onDragEnd();
             }
-            this.cb.onDragEnd();
             this._resetTouchState();
             return;
         }
 
-        // ── task 위 드롭 ──
+        // ── task 위 드롭: 기존 콜백 ──
         if (position === 'Above' || position === 'Below' || position === 'Inside') {
             var targetSelfEl = ts.currentDropTarget ? ts.currentDropTarget.closest('.task-node-self') : null;
             if (targetSelfEl) {
                 var targetId = parseInt(targetSelfEl.dataset.taskId);
                 targetSelfEl.classList.remove('drop-above', 'drop-below', 'drop-inside', 'drop-invalid');
-                if (targetId) {
-                    this.cb.onDrop(targetId, position);
-                }
+                if (targetId) this.cb.onDrop(targetId, position);
             }
             this.cb.onDragEnd();
             this._resetTouchState();
@@ -496,23 +404,10 @@ class TaskNodeRenderer {
         this._resetTouchState();
     }
 
-    _getDragIds() {
-        if (this.cb.getDraggedId) {
-            var draggedId = this.cb.getDraggedId();
-            if (draggedId) return [draggedId];
-        }
-        return [];
-    }
-
     _cancelTouch() {
         var ts = this._touchState;
-        if (ts.longPressTimer) {
-            clearTimeout(ts.longPressTimer);
-            ts.longPressTimer = null;
-        }
-        if (ts.sourceEl) {
-            ts.sourceEl.removeEventListener('contextmenu', this._preventContext);
-        }
+        if (ts.longPressTimer) { clearTimeout(ts.longPressTimer); ts.longPressTimer = null; }
+        if (ts.sourceEl) ts.sourceEl.removeEventListener('contextmenu', this._preventContext);
         document.removeEventListener('touchmove', this._boundTouchMove);
         document.removeEventListener('touchend', this._boundTouchEnd);
         this._resetTouchState();
@@ -522,33 +417,17 @@ class TaskNodeRenderer {
         document.querySelectorAll('.drop-above, .drop-below, .drop-inside, .drop-invalid, .drag-over-top, .drag-over-column').forEach(function(el) {
             el.classList.remove('drop-above', 'drop-below', 'drop-inside', 'drop-invalid', 'drag-over-top', 'drag-over-column');
         });
-
         this._touchState = {
-            startX: 0,
-            startY: 0,
-            offsetX: 0,
-            offsetY: 0,
-            taskId: null,
-            sourceEl: null,
-            ghostEl: null,
-            isDragging: false,
-            longPressTimer: null,
-            currentDropTarget: null,
-            currentDropPosition: null,
-            lastTouchX: 0,
-            lastTouchY: 0
+            startX: 0, startY: 0, offsetX: 0, offsetY: 0,
+            taskId: null, sourceEl: null, ghostEl: null,
+            isDragging: false, longPressTimer: null,
+            currentDropTarget: null, currentDropPosition: null,
+            lastTouchX: 0, lastTouchY: 0
         };
     }
 
-    // ══════════════════════════════════
-    // 데스크탑 Drag 핸들러
-    // ══════════════════════════════════
-
     _clearHoldTimer() {
-        if (this._holdTimer) {
-            clearTimeout(this._holdTimer);
-            this._holdTimer = null;
-        }
+        if (this._holdTimer) { clearTimeout(this._holdTimer); this._holdTimer = null; }
         this._holdTargetEl = null;
     }
 
@@ -566,18 +445,12 @@ class TaskNodeRenderer {
             selfEl.classList.add('drop-invalid');
             return;
         }
-
-        if (selfEl.classList.contains('drop-inside')) {
-            return;
-        }
+        if (selfEl.classList.contains('drop-inside')) return;
 
         selfEl.classList.remove('drop-above', 'drop-below', 'drop-invalid');
-
         var rect = selfEl.getBoundingClientRect();
         var offsetY = e.clientY - rect.top;
-        var height = rect.height;
-
-        if (offsetY < height * 0.5) {
+        if (offsetY < rect.height * 0.5) {
             selfEl.classList.add('drop-above');
         } else {
             selfEl.classList.add('drop-below');
@@ -600,13 +473,9 @@ class TaskNodeRenderer {
             selfEl.classList.remove('drop-above', 'drop-below', 'drop-inside', 'drop-invalid');
             return;
         }
-
         var position = 'Below';
-        if (selfEl.classList.contains('drop-inside')) {
-            position = 'Inside';
-        } else if (selfEl.classList.contains('drop-above')) {
-            position = 'Above';
-        }
+        if (selfEl.classList.contains('drop-inside')) position = 'Inside';
+        else if (selfEl.classList.contains('drop-above')) position = 'Above';
 
         selfEl.classList.remove('drop-above', 'drop-below', 'drop-inside', 'drop-invalid');
         this.cb.onDrop(targetTask.Id, position);
