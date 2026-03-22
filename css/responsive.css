@@ -78,6 +78,32 @@
     .btn-text {
         display: none;
     }
+
+    /* ★ 모바일: x, + 버튼 항상 보이기 ★ */
+    .action-btn {
+        opacity: 1 !important;
+    }
+
+    .action-btn.delete-btn {
+        font-size: 1.1rem;
+        padding: 0 6px;
+        color: #adb5bd;
+    }
+
+    .action-btn.add-btn {
+        font-size: 0.9rem;
+        padding: 0 6px;
+        color: #adb5bd;
+    }
+
+    /* 터치했을 때 색상 진하게 */
+    .action-btn.delete-btn:active {
+        color: #dc3545;
+    }
+
+    .action-btn.add-btn:active {
+        color: var(--primary-color, #3b82f6);
+    }
 }
 
 /* ─────────────────────────────
@@ -275,6 +301,17 @@
     /* 날짜 그리드 */
     .date-group {
         grid-template-columns: 1fr;
+    }
+
+    /* ★ 소형 모바일: 버튼 더 작게 ★ */
+    .action-btn.delete-btn {
+        font-size: 1rem;
+        padding: 0 4px;
+    }
+
+    .action-btn.add-btn {
+        font-size: 0.8rem;
+        padding: 0 4px;
     }
 }
 
