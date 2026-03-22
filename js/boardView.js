@@ -5,502 +5,519 @@ class BoardView {
         this.toast = toastService;
         this.dragDrop = new DragDropManager();
         this.modal = new TaskModal(dataService);
-        this.bulkEdit = new BulkEditPanel();
-
+        this.bulkPanel = new BulkEditPanel();
         this.selectedIds = new Set();
         this.isMultiSelectMode = false;
         this.lastClickedId = null;
         this.renderedTasks = [];
-
-        this.hideCompleted = JSON.parse(localStorage.getItem('gtd-hideCompleted') || 'false');
-        this.showHidden = JSON.parse(localStorage.getItem('gtd-showHidden') || 'false');
-
+        this.hideCompleted = localStorage.getItem('gtd-hide-completed') === 'true';
+        this.showHidden = localStorage.getItem('gtd-show-hidden') === 'true';
         this.nodeRenderer = new TaskNodeRenderer(dataService, {
-            onTaskClick: (id, e) => this._handleTaskClick(id, e),
-            onDoubleClick: (id) => this._openModal(id),
-            onToggleComplete: (id) => this.ds.toggleComplete(id),
-            onDelete: (id) => this._deleteTask(id),
-            onAddChild: (id, nodeEl) => this._showChildQuickAdd(id, nodeEl),
-            onDragStart: (id, el) => this.dragDrop.startDrag(id, el),
+            onTaskClick: (task, e) => this._handleTaskClick(task, e),
+            onTaskDblClick: (task) => this._openModal(task),
+            onToggleComplete: (task) => {
+                this.ds.toggleComplete(task.Id);
+            },
+            onDelete: (task) => this._deleteTask(task),
+            onAddChild: (task) => this._showChildQuickAdd(task),
+            onDragStart: (taskId, el) => {
+                this.dragDrop.setSelectedIds(this.selectedIds);
+                this.dragDrop.startDrag(taskId, el);
+            },
             onDragEnd: () => this.dragDrop.endDrag(),
             onDrop: (targetId, position) => this._handleDrop(targetId, position),
-            getDraggedId: () => this.dragDrop.getDraggedId(),
-            onRefresh: () => this.render(),
+            onRefresh: () => this.render()
         });
     }
 
     render() {
-        var container = document.getElementById('content-area');
+        const container = document.getElementById('content-area');
         if (!container) return;
         container.innerHTML = '';
 
-        var home = document.createElement('div');
-        home.className = 'home-container';
+        const wrapper = document.createElement('div');
+        wrapper.className = 'board-container';
 
-        home.appendChild(this._renderHeader());
+        const header = this._renderHeader();
+        wrapper.appendChild(header);
 
-        var board = document.createElement('div');
-        board.className = 'board-container';
+        const columnsRow = document.createElement('div');
+        columnsRow.className = 'board-columns';
 
-        var todayCol = this._renderColumn('Today', this.ds.getTodayTasks(), true);
+        // Today column
+        const todayTasks = this.ds.getTodayTasks();
+        const todayCol = this._renderColumn('오늘 할 일', todayTasks, null, true);
         todayCol.classList.add('today-column');
-        board.appendChild(todayCol);
+        columnsRow.appendChild(todayCol);
 
-        for (var s = 0; s < TaskStatusList.length; s++) {
-            var status = TaskStatusList[s];
-            var tasks = this.ds.getTasksForStatus(status);
-            var col = this._renderColumn(status, tasks, false, status);
-            board.appendChild(col);
-        }
+        // Status columns
+        TaskStatusList.forEach(status => {
+            const tasks = this.ds.getTasksForStatus(status);
+            const col = this._renderColumn(status, tasks, status, false);
+            columnsRow.appendChild(col);
+        });
 
-        home.appendChild(board);
-        home.appendChild(this._renderBulkBar());
-        container.appendChild(home);
+        wrapper.appendChild(columnsRow);
+
+        // Bulk action bar
+        const bulkBar = this._renderBulkBar();
+        if (bulkBar) wrapper.appendChild(bulkBar);
+
+        container.appendChild(wrapper);
 
         this.dragDrop.setSelectedIds(this.selectedIds);
-        this._buildRenderedList();
+        this.renderedTasks = this._buildRenderedList();
     }
 
     _renderHeader() {
-        var header = document.createElement('div');
-        header.className = 'main-header modern-header';
+        const header = document.createElement('div');
+        header.className = 'board-header';
 
-        var activeTasks = this.ds.getActiveTasks(this.showHidden);
-        var todayTasks = this.ds.getTodayTasks();
-        var focusTasks = this.ds.getFocusTasks();
+        const stats = document.createElement('div');
+        stats.className = 'header-stats';
 
-        header.innerHTML =
-            '<div class="header-content">' +
-                '<div class="header-left">' +
-                    '<div class="app-logo">' +
-                        '<div class="logo-icon"><span style="font-size:20px;color:white;">▦</span></div>' +
-                        '<div class="logo-text">' +
-                            '<h1 class="app-title">GTD Board</h1>' +
-                            '<span class="app-subtitle">Getting Things Done</span>' +
-                        '</div>' +
-                    '</div>' +
-                '</div>' +
-                '<div class="header-center">' +
-                    '<div class="header-stats">' +
-                        '<a class="stat-item-link" data-nav="active">' +
-                            '<div class="stat-item">' +
-                                '<span class="stat-number">' + activeTasks.length + '</span>' +
-                                '<span class="stat-label">Active Tasks</span>' +
-                            '</div>' +
-                        '</a>' +
-                        '<div class="stat-divider"></div>' +
-                        '<div class="stat-item">' +
-                            '<span class="stat-number">' + todayTasks.length + '</span>' +
-                            '<span class="stat-label">Today</span>' +
-                        '</div>' +
-                        '<div class="stat-divider"></div>' +
-                        '<a class="stat-item-link" data-nav="focus">' +
-                            '<div class="stat-item">' +
-                                '<span class="stat-number">' + focusTasks.length + '</span>' +
-                                '<span class="stat-label">Focus</span>' +
-                            '</div>' +
-                        '</a>' +
-                    '</div>' +
-                '</div>' +
-                '<div class="header-right">' +
-                    '<div class="data-manager-btns">' +
-                        '<button class="btn-modern" id="btn-export" title="Export">' +
-                            '<span>↓</span><span class="btn-text">Export</span>' +
-                        '</button>' +
-                        '<button class="btn-modern" id="btn-import" title="Import">' +
-                            '<span>↑</span><span class="btn-text">Import</span>' +
-                        '</button>' +
-                        '<input type="file" id="file-import" accept=".json" class="file-input-hidden" />' +
-                    '</div>' +
-                    '<button class="btn-modern" id="btn-undo" title="실행 취소" ' + (this.undo.canUndo() ? '' : 'disabled') + '>' +
-                        '<span>↶</span>' +
-                    '</button>' +
-                    '<button class="btn-modern" id="btn-hide-completed" title="' + (this.hideCompleted ? 'Show completed' : 'Hide completed') + '">' +
-                        '<span>' + (this.hideCompleted ? '👁' : '🙈') + '</span>' +
-                        '<span class="btn-text">' + (this.hideCompleted ? 'Show' : 'Hide') + '</span>' +
-                    '</button>' +
-                    '<button class="btn-modern" id="btn-show-hidden" title="' + (this.showHidden ? 'Hide hidden' : 'Show hidden') + '">' +
-                        '<span>' + (this.showHidden ? '👁' : '🙈') + '</span>' +
-                        '<span class="btn-text">Hidden</span>' +
-                    '</button>' +
-                '</div>' +
-            '</div>';
+        const activeTasks = this.ds.getActiveTasks();
+        const todayTasks = this.ds.getTodayTasks();
+        const focusTasks = this.ds.getFocusTasks();
 
-        setTimeout(() => this._wireHeaderEvents(), 0);
+        stats.innerHTML = `
+            <div class="stat-item">
+                <span class="stat-label">Active</span>
+                <span class="stat-value">${activeTasks.length}</span>
+            </div>
+            <span class="stat-separator">|</span>
+            <div class="stat-item">
+                <span class="stat-label">Today</span>
+                <span class="stat-value">${todayTasks.length}</span>
+            </div>
+            <span class="stat-separator">|</span>
+            <div class="stat-item">
+                <span class="stat-label">Focus</span>
+                <span class="stat-value">${focusTasks.length}</span>
+            </div>
+        `;
+
+        const actions = document.createElement('div');
+        actions.className = 'header-actions';
+        actions.innerHTML = `
+            <button class="btn-modern" id="btn-export" title="Export">📤 Export</button>
+            <button class="btn-modern" id="btn-import" title="Import">📥 Import</button>
+            <input type="file" id="import-file" accept=".json" style="display:none">
+            <button class="btn-modern" id="btn-undo" title="Undo (Ctrl+Z)" disabled>↩️ Undo</button>
+            <button class="btn-modern" id="btn-hide-completed">${this.hideCompleted ? '👁️ Show Completed' : '🙈 Hide Completed'}</button>
+            <button class="btn-modern" id="btn-show-hidden" style="display:${this.showHidden ? 'inline-flex' : 'none'}">${this.showHidden ? '👻 Hide Hidden' : '👻 Show Hidden'}</button>
+        `;
+
+        header.appendChild(stats);
+        header.appendChild(actions);
+
+        this._wireHeaderEvents(actions);
+
         return header;
     }
 
-    _wireHeaderEvents() {
-        var self = this;
-        var exportBtn = document.getElementById('btn-export');
-        if (exportBtn) exportBtn.addEventListener('click', function() { self._exportData(); });
+    _wireHeaderEvents(actions) {
+        const self = this;
+        const exportBtn = actions.querySelector('#btn-export');
+        const importBtn = actions.querySelector('#btn-import');
+        const importFile = actions.querySelector('#import-file');
+        const undoBtn = actions.querySelector('#btn-undo');
+        const hideCompletedBtn = actions.querySelector('#btn-hide-completed');
+        const showHiddenBtn = actions.querySelector('#btn-show-hidden');
 
-        var importBtn = document.getElementById('btn-import');
-        if (importBtn) importBtn.addEventListener('click', function() {
-            var fileInput = document.getElementById('file-import');
-            if (fileInput) fileInput.click();
-        });
-
-        var fileInput = document.getElementById('file-import');
-        if (fileInput) fileInput.addEventListener('change', function(e) { self._importData(e); });
-
-        var undoBtn = document.getElementById('btn-undo');
-        if (undoBtn) undoBtn.addEventListener('click', function() { self.undo.undoLatest(); });
-
-        var hideBtn = document.getElementById('btn-hide-completed');
-        if (hideBtn) hideBtn.addEventListener('click', function() {
-            self.hideCompleted = !self.hideCompleted;
-            localStorage.setItem('gtd-hideCompleted', JSON.stringify(self.hideCompleted));
-            self.render();
-        });
-
-        var showBtn = document.getElementById('btn-show-hidden');
-        if (showBtn) showBtn.addEventListener('click', function() {
-            self.showHidden = !self.showHidden;
-            localStorage.setItem('gtd-showHidden', JSON.stringify(self.showHidden));
-            self.render();
-        });
-
-        document.querySelectorAll('[data-nav]').forEach(function(el) {
-            el.addEventListener('click', function(e) {
-                e.preventDefault();
-                var nav = el.dataset.nav;
-                if (window.app) window.app.navigate(nav);
+        if (exportBtn) exportBtn.addEventListener('click', () => self._exportData());
+        if (importBtn) importBtn.addEventListener('click', () => importFile.click());
+        if (importFile) importFile.addEventListener('change', (e) => self._importData(e));
+        if (undoBtn) {
+            if (self.undo.canUndo) undoBtn.disabled = false;
+            undoBtn.addEventListener('click', async () => {
+                await self.undo.undoLatest();
+                self.render();
             });
-        });
+        }
+        if (hideCompletedBtn) {
+            hideCompletedBtn.addEventListener('click', () => {
+                self.hideCompleted = !self.hideCompleted;
+                localStorage.setItem('gtd-hide-completed', self.hideCompleted);
+                self.render();
+            });
+        }
+        if (showHiddenBtn) {
+            showHiddenBtn.addEventListener('click', () => {
+                self.showHidden = !self.showHidden;
+                localStorage.setItem('gtd-show-hidden', self.showHidden);
+                self.render();
+            });
+        }
     }
 
-    _renderColumn(title, tasks, isTodayCol, status) {
-        var col = document.createElement('div');
+    _renderColumn(title, tasks, status, isTodayColumn) {
+        const col = document.createElement('div');
         col.className = 'board-column';
         if (status) col.dataset.status = status;
 
+        const colHeader = document.createElement('div');
+        colHeader.className = 'column-header';
+
+        const filteredTasks = this._filterTasks(tasks);
+
+        const titleEl = document.createElement('h3');
+        titleEl.textContent = title + ' (' + filteredTasks.length + ')';
+        colHeader.appendChild(titleEl);
+
         if (status === TaskStatus.Completed) {
-            var headerDiv = document.createElement('div');
-            headerDiv.className = 'column-header-with-action';
-            headerDiv.innerHTML = '<h3 class="column-header">' + title + '</h3>';
-            var clearBtn = document.createElement('button');
+            const clearBtn = document.createElement('button');
             clearBtn.className = 'btn-clear-completed';
-            clearBtn.title = 'Clear all completed';
-            clearBtn.innerHTML = '🗑';
+            clearBtn.textContent = '🗑️ Clear All';
             clearBtn.addEventListener('click', () => {
-                if (confirm('완료된 모든 항목을 삭제하시겠습니까?')) {
+                if (confirm('완료된 모든 작업을 삭제하시겠습니까?')) {
+                    const completedTasks = this.ds.getTasksForStatus(TaskStatus.Completed);
+                    const snapshot = completedTasks.map(t => t.clone());
                     this.ds.deleteAllCompleted();
+                    this.undo.push({
+                        desc: `Deleted ${snapshot.length} completed tasks`,
+                        undo: () => this.ds.restoreTasks(snapshot)
+                    });
                 }
             });
-            headerDiv.appendChild(clearBtn);
-            col.appendChild(headerDiv);
-        } else {
-            var h = document.createElement('h3');
-            h.className = 'column-header';
-            h.textContent = title;
-            col.appendChild(h);
+            colHeader.appendChild(clearBtn);
         }
 
-        var list = document.createElement('div');
-        list.className = 'task-list';
+        col.appendChild(colHeader);
 
-        var filteredTasks = this._filterTasks(tasks);
-        for (var i = 0; i < filteredTasks.length; i++) {
-            var node = this.nodeRenderer.render(filteredTasks[i], {
-                hideCompleted: this.hideCompleted,
-                showHidden: this.showHidden,
-                selectedIds: this.selectedIds,
-                isMultiSelectMode: this.isMultiSelectMode,
-            });
-            if (node) list.appendChild(node);
-        }
-        col.appendChild(list);
+        const taskList = document.createElement('div');
+        taskList.className = 'task-list';
 
-        if (status) {
-            col.addEventListener('dragover', (e) => {
+        if (!isTodayColumn) {
+            taskList.addEventListener('dragover', (e) => {
                 e.preventDefault();
-                col.classList.add('drag-over');
+                taskList.classList.add('drag-over-column');
             });
-            col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
-            col.addEventListener('drop', (e) => {
+            taskList.addEventListener('dragleave', () => {
+                taskList.classList.remove('drag-over-column');
+            });
+            taskList.addEventListener('drop', (e) => {
                 e.preventDefault();
-                col.classList.remove('drag-over');
-                var idsToMove = this.dragDrop.getIdsToMove();
-                if (idsToMove.length > 0) {
-                    var siblings = this.ds.getTasksForStatus(status);
-                    this.ds.moveTasks(idsToMove, status, null, siblings.length);
+                taskList.classList.remove('drag-over-column');
+                const draggedIds = this.dragDrop.getMovingIds();
+                if (draggedIds.length > 0 && status) {
+                    this.ds.moveTasks(draggedIds, status, null, 'Inside');
                 }
                 this.dragDrop.endDrag();
             });
+        }
 
-            if (!isTodayCol) {
-                var addBtn = document.createElement('button');
-                addBtn.className = 'add-task-btn';
-                addBtn.textContent = '+ Add Task';
-                addBtn.addEventListener('click', () => this._showQuickAdd(col, status));
-                col.appendChild(addBtn);
-            }
+        const trees = this.ds.buildTree(filteredTasks);
+        trees.forEach(task => {
+            const node = this.nodeRenderer.render(task, {
+                selectedIds: this.selectedIds,
+                hideCompleted: this.hideCompleted,
+                showHidden: this.showHidden
+            });
+            if (node) taskList.appendChild(node);
+        });
+
+        col.appendChild(taskList);
+
+        if (status && status !== TaskStatus.Completed && !isTodayColumn) {
+            const addBtn = document.createElement('button');
+            addBtn.className = 'add-task-btn';
+            addBtn.textContent = '+ Add Task';
+            addBtn.addEventListener('click', () => this._showQuickAdd(col, status, addBtn));
+            col.appendChild(addBtn);
         }
 
         return col;
     }
 
     _filterTasks(tasks) {
-        var result = tasks;
-        if (this.hideCompleted) result = result.filter(function(t) { return !t.IsCompleted; });
-        if (!this.showHidden) result = result.filter(function(t) { return !t.IsHidden; });
-        return result;
+        return tasks.filter(t => {
+            if (this.hideCompleted && t.IsCompleted) return false;
+            if (!this.showHidden && t.IsHidden) return false;
+            return true;
+        });
     }
 
-    _showQuickAdd(colEl, status) {
+    _showQuickAdd(column, status, addBtn) {
         var self = this;
-        colEl.querySelectorAll('.quick-add-container').forEach(function(e) { e.remove(); });
-        var addBtn = colEl.querySelector('.add-task-btn');
         if (addBtn) addBtn.style.display = 'none';
 
         var container = document.createElement('div');
         container.className = 'quick-add-container';
-        var input = document.createElement('input');
-        input.placeholder = 'Enter a title...';
 
-        var submitted = false;
-        input.addEventListener('keyup', function(e) {
-            if (e.key === 'Enter' && input.value.trim()) {
-                submitted = true;
-                self.ds.addTask(input.value.trim(), status, null);
-                input.value = '';
-                submitted = false;
-                input.focus();
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'quick-add-input';
+        input.placeholder = 'New task title...';
+        container.appendChild(input);
+        column.appendChild(container);
+        input.focus();
+
+        var done = false;
+
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (input.value.trim() && !done) {
+                    done = true;
+                    self.ds.addTask(input.value.trim(), status, null);
+                    input.value = '';
+                    done = false;
+                    input.focus();
+                }
             } else if (e.key === 'Escape') {
-                submitted = true;
+                done = true;
+                input.blur();
+            }
+        });
+
+        input.addEventListener('blur', function () {
+            setTimeout(function () {
+                if (!done && input.value.trim()) {
+                    self.ds.addTask(input.value.trim(), status, null);
+                }
                 container.remove();
                 if (addBtn) addBtn.style.display = '';
-            }
+            }, 150);
         });
-        input.addEventListener('blur', function() {
-            if (!submitted && input.value.trim()) {
-                self.ds.addTask(input.value.trim(), status, null);
-            }
-            container.remove();
-            if (addBtn) addBtn.style.display = '';
-        });
-        container.appendChild(input);
-        colEl.appendChild(container);
-        setTimeout(function() { input.focus(); }, 50);
     }
 
-    _showChildQuickAdd(parentId, nodeEl) {
+    _showChildQuickAdd(parent) {
         var self = this;
-        var parent = this.ds.getById(parentId);
-        if (!parent) return;
-        if (!parent.IsExpanded) {
-            parent.IsExpanded = true;
-            this.ds.updateExpandState(parentId, true);
-            this.render();
-            return;
-        }
+        var parentId = parent.Id;
+        var parentEl = document.querySelector('[data-task-id="' + parentId + '"]');
+        if (!parentEl) return;
 
-        var childrenEl = nodeEl.querySelector('.task-node-children');
-        if (!childrenEl) {
-            childrenEl = document.createElement('div');
-            childrenEl.className = 'task-node-children';
-            nodeEl.appendChild(childrenEl);
+        var childrenContainer = parentEl.querySelector('.task-node-children');
+        if (!childrenContainer) {
+            childrenContainer = document.createElement('div');
+            childrenContainer.className = 'task-node-children';
+            parentEl.appendChild(childrenContainer);
         }
-
-        childrenEl.querySelectorAll('.quick-add-container').forEach(function(e) { e.remove(); });
 
         var container = document.createElement('div');
-        container.className = 'quick-add-container child-add';
-        var input = document.createElement('input');
-        input.placeholder = 'Add a sub-task...';
+        container.className = 'quick-add-container';
 
-        var submitted = false;
-        input.addEventListener('keyup', function(e) {
-            if (e.key === 'Enter' && input.value.trim()) {
-                submitted = true;
-                self.ds.addTask(input.value.trim(), parent.Status, parentId);
-                input.value = '';
-                submitted = false;
-                input.focus();
-            } else if (e.key === 'Escape') {
-                submitted = true;
-                container.remove();
-            }
-        });
-        input.addEventListener('blur', function() {
-            if (!submitted && input.value.trim()) {
-                self.ds.addTask(input.value.trim(), parent.Status, parentId);
-            }
-            container.remove();
-        });
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'quick-add-input';
+        input.placeholder = 'New subtask...';
         container.appendChild(input);
-        childrenEl.appendChild(container);
-        setTimeout(function() { input.focus(); }, 50);
+        childrenContainer.appendChild(container);
+        input.focus();
+
+        if (!parent.IsExpanded) {
+            this.ds.updateExpandState(parentId, true);
+        }
+
+        var done = false;
+
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (input.value.trim() && !done) {
+                    done = true;
+                    self.ds.addTask(input.value.trim(), parent.Status, parentId);
+                    input.value = '';
+                    done = false;
+                    input.focus();
+                }
+            } else if (e.key === 'Escape') {
+                done = true;
+                input.blur();
+            }
+        });
+
+        input.addEventListener('blur', function () {
+            setTimeout(function () {
+                if (!done && input.value.trim()) {
+                    self.ds.addTask(input.value.trim(), parent.Status, parentId);
+                }
+                container.remove();
+            }, 150);
+        });
     }
 
-    _handleTaskClick(taskId, e) {
-        if (this.isMultiSelectMode || e.ctrlKey || e.metaKey || e.shiftKey) {
-            if (e.shiftKey && this.lastClickedId != null) {
-                var lastIdx = this.renderedTasks.findIndex(function(t) { return t.Id === this.lastClickedId; }.bind(this));
-                var curIdx = this.renderedTasks.findIndex(function(t) { return t.Id === taskId; });
-                if (lastIdx !== -1 && curIdx !== -1) {
-                    var start = Math.min(lastIdx, curIdx);
-                    var end = Math.max(lastIdx, curIdx);
-                    if (!e.ctrlKey && !e.metaKey) this.selectedIds.clear();
-                    for (var i = start; i <= end; i++) {
-                        this.selectedIds.add(this.renderedTasks[i].Id);
-                    }
-                }
+    _handleTaskClick(task, e) {
+        if (e.ctrlKey || e.metaKey) {
+            if (this.selectedIds.has(task.Id)) {
+                this.selectedIds.delete(task.Id);
             } else {
-                if (this.selectedIds.has(taskId)) this.selectedIds.delete(taskId);
-                else this.selectedIds.add(taskId);
+                this.selectedIds.add(task.Id);
             }
+            this.isMultiSelectMode = this.selectedIds.size > 0;
+        } else if (e.shiftKey && this.lastClickedId !== null) {
+            const list = this.renderedTasks;
+            const startIdx = list.findIndex(t => t.Id === this.lastClickedId);
+            const endIdx = list.findIndex(t => t.Id === task.Id);
+            if (startIdx !== -1 && endIdx !== -1) {
+                const from = Math.min(startIdx, endIdx);
+                const to = Math.max(startIdx, endIdx);
+                for (let i = from; i <= to; i++) {
+                    this.selectedIds.add(list[i].Id);
+                }
+            }
+            this.isMultiSelectMode = true;
         } else {
-            this.selectedIds.clear();
-            this.selectedIds.add(taskId);
+            if (this.selectedIds.has(task.Id) && this.selectedIds.size === 1) {
+                this.selectedIds.clear();
+                this.isMultiSelectMode = false;
+            } else {
+                this.selectedIds.clear();
+                this.selectedIds.add(task.Id);
+                this.isMultiSelectMode = false;
+            }
         }
-        this.lastClickedId = taskId;
+        this.lastClickedId = task.Id;
         this.render();
     }
 
-    _openModal(taskId) {
-        this.modal.open(taskId, function() {});
-    }
-
-    _deleteTask(id) {
-        var snapshot = this.ds.deleteTask(id);
-        this.undo.push({
-            description: '작업 삭제됨',
-            undo: () => this.ds.restoreTasks(snapshot)
+    _openModal(task) {
+        this.modal.open(task.Id, () => {
+            this.render();
         });
     }
 
-    _handleDrop(targetTaskId, position) {
-        var idsToMove = this.dragDrop.getIdsToMove();
-        if (idsToMove.length === 0) return;
-        if (idsToMove.includes(targetTaskId)) return;
+    _deleteTask(task) {
+        const snapshot = task.clone();
+        const children = this.ds.getAllTasks().filter(t => t.ParentId === task.Id).map(t => t.clone());
+        this.ds.deleteTask(task.Id);
+        this.undo.push({
+            desc: `Deleted "${task.Title}"`,
+            undo: () => {
+                this.ds.restoreTasks([snapshot, ...children]);
+            }
+        });
+    }
 
-        var target = this.ds.getById(targetTaskId);
-        if (!target) return;
+    _handleDrop(targetId, position) {
+        const movingIds = this.dragDrop.getMovingIds();
+        if (movingIds.length === 0) return;
 
-        var parentId, sortOrder;
-        switch (position) {
-            case 'Inside':
-                parentId = target.Id;
-                sortOrder = this.ds.getRawTasks().filter(function(t) { return t.ParentId === target.Id; }).length;
-                break;
-            case 'Above':
-                parentId = target.ParentId;
-                sortOrder = target.SortOrder;
-                break;
-            case 'Below':
-                parentId = target.ParentId;
-                sortOrder = target.SortOrder + 1;
-                break;
-        }
-        this.ds.moveTasks(idsToMove, target.Status, parentId, sortOrder);
+        const targetTask = this.ds.getById(targetId);
+        if (!targetTask) return;
+
+        const newStatus = targetTask.Status;
+        this.ds.moveTasks(movingIds, newStatus, targetId, position);
         this.dragDrop.endDrag();
     }
 
     _renderBulkBar() {
-        var self = this;
-        var bar = document.createElement('div');
-        bar.className = 'bulk-action-bar ' + (this.selectedIds.size > 1 || this.isMultiSelectMode ? 'visible' : '');
-        bar.innerHTML =
-            '<div class="bar-content">' +
-                '<span class="selection-count">' + this.selectedIds.size + '개 선택됨</span>' +
-                '<div class="actions">' +
-                    '<button id="bulk-edit-btn">✎ 일괄 편집</button>' +
-                    '<button class="danger" id="bulk-delete-btn">🗑 삭제</button>' +
-                '</div>' +
-            '</div>' +
-            '<button class="close-btn" id="bulk-deselect">×</button>';
+        if (this.selectedIds.size < 2) return null;
 
-        setTimeout(function() {
-            var editBtn = document.getElementById('bulk-edit-btn');
-            if (editBtn) editBtn.addEventListener('click', function() {
-                self.bulkEdit.show(self.selectedIds, function(model) {
+        const bar = document.createElement('div');
+        bar.className = 'bulk-action-bar';
+        bar.innerHTML = `
+            <span>${this.selectedIds.size} tasks selected</span>
+            <button class="btn-modern" id="bulk-edit-btn">✏️ Bulk Edit</button>
+            <button class="btn-modern" id="bulk-delete-btn">🗑️ Delete</button>
+            <button class="btn-modern" id="bulk-cancel-btn">✖ Cancel</button>
+        `;
+
+        const self = this;
+
+        bar.querySelector('#bulk-edit-btn').addEventListener('click', () => {
+            this.bulkPanel.show(
+                this.selectedIds,
+                (model) => {
+                    const snapshots = [];
+                    model.taskIds.forEach(id => {
+                        const t = self.ds.getById(id);
+                        if (t) snapshots.push(t.clone());
+                    });
                     self.ds.bulkUpdate(model);
-                }, function() { self.bulkEdit.hide(); });
-            });
-
-            var delBtn = document.getElementById('bulk-delete-btn');
-            if (delBtn) delBtn.addEventListener('click', function() {
-                if (confirm(self.selectedIds.size + '개의 항목을 삭제하시겠습니까?')) {
-                    var snapshot = self.ds.deleteTasks([...self.selectedIds]);
                     self.undo.push({
-                        description: snapshot.length + '개 작업 삭제됨',
-                        undo: function() { self.ds.restoreTasks(snapshot); }
+                        desc: `Bulk edited ${model.taskIds.length} tasks`,
+                        undo: () => self.ds.restoreTasks(snapshots)
                     });
                     self.selectedIds.clear();
-                    self.isMultiSelectMode = false;
-                }
-            });
+                    self.render();
+                },
+                () => {}
+            );
+        });
 
-            var deselectBtn = document.getElementById('bulk-deselect');
-            if (deselectBtn) deselectBtn.addEventListener('click', function() {
-                self.selectedIds.clear();
-                self.isMultiSelectMode = false;
-                self.render();
-            });
-        }, 0);
+        bar.querySelector('#bulk-delete-btn').addEventListener('click', () => {
+            if (confirm(this.selectedIds.size + '개 작업을 삭제하시겠습니까?')) {
+                const ids = Array.from(this.selectedIds);
+                const snapshots = ids.map(id => this.ds.getById(id)).filter(Boolean).map(t => t.clone());
+                this.ds.deleteTasks(ids);
+                this.undo.push({
+                    desc: `Deleted ${ids.length} tasks`,
+                    undo: () => this.ds.restoreTasks(snapshots)
+                });
+                this.selectedIds.clear();
+                this.render();
+            }
+        });
+
+        bar.querySelector('#bulk-cancel-btn').addEventListener('click', () => {
+            this.selectedIds.clear();
+            this.isMultiSelectMode = false;
+            this.render();
+        });
 
         return bar;
     }
 
     _buildRenderedList() {
-        this.renderedTasks = [];
-        var tree = this.ds.getAllTasks();
-        var todayTasks = this.ds.getTodayTasks();
-        var self = this;
-
-        var flatten = function(items) {
-            for (var i = 0; i < items.length; i++) {
-                self.renderedTasks.push(items[i]);
-                if (items[i].IsExpanded && items[i].Children.length > 0) {
-                    flatten(items[i].Children);
-                }
-            }
-        };
-        flatten(todayTasks);
-        for (var s = 0; s < TaskStatusList.length; s++) {
-            flatten(this.ds.getTasksForStatus(TaskStatusList[s]));
-        }
-        var seen = new Set();
-        this.renderedTasks = this.renderedTasks.filter(function(t) {
-            if (seen.has(t.Id)) return false;
-            seen.add(t.Id);
-            return true;
+        const all = [];
+        TaskStatusList.forEach(status => {
+            const tasks = this.ds.getTasksForStatus(status);
+            const filtered = this._filterTasks(tasks);
+            const trees = this.ds.buildTree(filtered);
+            const flatten = (list) => {
+                list.forEach(t => {
+                    all.push(t);
+                    if (t.Children && t.Children.length > 0 && t.IsExpanded) {
+                        flatten(t.Children);
+                    }
+                });
+            };
+            flatten(trees);
         });
+        return all;
     }
 
     deselectAll() {
-        this.selectedIds.clear();
-        this.isMultiSelectMode = false;
-        this.lastClickedId = null;
-        this.bulkEdit.hide();
-        this.render();
+        if (this.selectedIds.size > 0) {
+            this.selectedIds.clear();
+            this.isMultiSelectMode = false;
+            this.render();
+        }
     }
 
     _exportData() {
-        var json = this.ds.exportToJson();
-        var blob = new Blob([json], { type: 'application/json' });
-        var url = URL.createObjectURL(blob);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = 'gtd-tasks-' + new Date().toISOString().split('T')[0] + '.json';
-        a.click();
-        URL.revokeObjectURL(url);
-        this.toast.success('데이터를 내보냈습니다.');
+        try {
+            const json = this.ds.exportToJson();
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'gtd-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+            a.click();
+            URL.revokeObjectURL(url);
+            this.toast.success('Data exported successfully');
+        } catch (e) {
+            this.toast.error('Export failed: ' + e.message);
+        }
     }
 
     _importData(e) {
-        var self = this;
-        var file = e.target.files[0];
+        const file = e.target.files[0];
         if (!file) return;
-        var reader = new FileReader();
-        reader.onload = function(evt) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
             try {
-                self.ds.importFromJson(evt.target.result);
-                self.toast.success('데이터를 가져왔습니다.');
+                const result = this.ds.importFromJson(evt.target.result);
+                if (result.success) {
+                    this.toast.success('Imported ' + result.count + ' tasks');
+                    this.render();
+                } else {
+                    this.toast.error('Import failed: ' + result.error);
+                }
             } catch (err) {
-                self.toast.error('가져오기 실패: ' + err.message);
+                this.toast.error('Import failed: ' + err.message);
             }
         };
         reader.readAsText(file);
