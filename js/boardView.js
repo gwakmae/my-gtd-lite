@@ -12,6 +12,7 @@ class BoardView {
         this.renderedTasks = [];
         this.hideCompleted = localStorage.getItem('gtd-hide-completed') === 'true';
         this.showHidden = localStorage.getItem('gtd-show-hidden') === 'true';
+        
         this.nodeRenderer = new TaskNodeRenderer(dataService, {
             onTaskClick: (taskId, e) => {
                 const task = this.ds.getById(taskId);
