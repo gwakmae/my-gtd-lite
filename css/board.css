@@ -40,7 +40,6 @@
     padding-bottom: var(--spacing-sm);
 }
 
-/* 태블릿/모바일: 칼럼 280px 고정 해제 */
 @media (max-width: 1199.98px) {
     .board-column {
         flex: 1 1 auto !important;
