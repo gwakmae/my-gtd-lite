@@ -68,21 +68,17 @@ class BoardView {
         if (!container) return;
         container.innerHTML = '';
 
-        // ★ 헤더를 board-container 밖에 배치 ★
         var header = this._renderHeader();
         container.appendChild(header);
 
-        // ★ board-container에는 칼럼만 직접 배치 (board-columns 래퍼 없음) ★
         var boardContainer = document.createElement('div');
         boardContainer.className = 'board-container';
 
-        // Today column
         var todayTasks = this.ds.getTodayTasks();
         var todayCol = this._renderColumn('오늘 할 일', todayTasks, null, true);
         todayCol.classList.add('today-column');
         boardContainer.appendChild(todayCol);
 
-        // Status columns
         var self = this;
         TaskStatusList.forEach(function(status) {
             var tasks = self.ds.getTasksForStatus(status);
@@ -92,7 +88,6 @@ class BoardView {
 
         container.appendChild(boardContainer);
 
-        // Bulk action bar
         var bulkBar = this._renderBulkBar();
         if (bulkBar) container.appendChild(bulkBar);
 
@@ -218,7 +213,6 @@ class BoardView {
         var taskList = document.createElement('div');
         taskList.className = 'task-list';
 
-        // ★ 칼럼 상단 드롭존 ★
         if (!isTodayColumn && status) {
             var topDropZone = document.createElement('div');
             topDropZone.className = 'column-drop-top';
@@ -244,7 +238,6 @@ class BoardView {
             taskList.appendChild(topDropZone);
         }
 
-        // ★ 칼럼 빈 영역 드롭 ★
         if (!isTodayColumn && status) {
             taskList.addEventListener('dragover', function(e) {
                 e.preventDefault();
@@ -273,9 +266,6 @@ class BoardView {
             });
         }
 
-        // ★ buildTree에 filteredTasks를 넘기지 않고, 이미 트리로 받은 tasks를 사용 ★
-        // getTasksForStatus가 이미 buildTree를 호출해서 트리를 반환하므로
-        // 여기서는 filteredTasks (flat이 아닌 tree roots)를 바로 사용
         filteredTasks.forEach(function(task) {
             var node = self.nodeRenderer.render(task, {
                 selectedIds: self.selectedIds,
@@ -308,9 +298,17 @@ class BoardView {
         });
     }
 
+    // ★★★ 수정: 칼럼 하단 Add Task — task-list 안 맨 아래에 input 표시 ★★★
     _showQuickAdd(column, status, addBtn) {
         var self = this;
         if (addBtn) addBtn.style.display = 'none';
+
+        // task-list 안의 맨 아래에 input을 넣어서 실제 추가될 위치에 보이게 함
+        var taskList = column.querySelector('.task-list');
+        if (!taskList) {
+            // fallback: task-list가 없으면 column에 직접
+            taskList = column;
+        }
 
         var container = document.createElement('div');
         container.className = 'quick-add-container';
@@ -318,9 +316,12 @@ class BoardView {
         var input = document.createElement('input');
         input.type = 'text';
         input.className = 'quick-add-input';
-        input.placeholder = 'New task title...';
+        input.placeholder = '새 작업 제목...';
         container.appendChild(input);
-        column.appendChild(container);
+        taskList.appendChild(container);
+
+        // 스크롤해서 input이 보이게
+        input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         input.focus();
 
         var done = false;
@@ -352,33 +353,63 @@ class BoardView {
         });
     }
 
+    // ★★★ 수정: Child Add — 부모의 children 영역 안에 input 표시 ★★★
     _showChildQuickAdd(parent) {
         var self = this;
         var parentId = parent.Id;
-        var nodeEl = document.querySelector('.task-node[data-task-id="' + parentId + '"]');
+
+        // .task-node[data-task-id] 찾기 (task-node-self가 아닌 task-node)
+        var allNodes = document.querySelectorAll('.task-node');
+        var nodeEl = null;
+        for (var i = 0; i < allNodes.length; i++) {
+            if (allNodes[i].dataset.taskId === String(parentId) &&
+                allNodes[i].classList.contains('task-node')) {
+                nodeEl = allNodes[i];
+                break;
+            }
+        }
         if (!nodeEl) return;
 
-        var childrenContainer = nodeEl.querySelector('.task-node-children');
+        // 부모가 접혀있으면 펼치기
+        if (!parent.IsExpanded) {
+            this.ds.updateExpandState(parentId, true);
+            // render 후 다시 찾아야 하므로 render 후 재호출
+            var self2 = this;
+            this.render();
+            // render 후 DOM이 갱신되므로 다시 찾기
+            setTimeout(function() {
+                self2._showChildQuickAdd(self2.ds.getById(parentId));
+            }, 50);
+            return;
+        }
+
+        // children 컨테이너 찾거나 만들기
+        var childrenContainer = nodeEl.querySelector(':scope > .task-node-children');
         if (!childrenContainer) {
             childrenContainer = document.createElement('div');
             childrenContainer.className = 'task-node-children';
             nodeEl.appendChild(childrenContainer);
         }
 
+        // 이미 quick-add가 있으면 중복 방지
+        if (childrenContainer.querySelector('.quick-add-container')) {
+            childrenContainer.querySelector('.quick-add-input').focus();
+            return;
+        }
+
         var container = document.createElement('div');
-        container.className = 'quick-add-container';
+        container.className = 'quick-add-container child-add';
 
         var input = document.createElement('input');
         input.type = 'text';
         input.className = 'quick-add-input';
-        input.placeholder = 'New subtask...';
+        input.placeholder = '하위 작업 제목...';
         container.appendChild(input);
         childrenContainer.appendChild(container);
-        input.focus();
 
-        if (!parent.IsExpanded) {
-            this.ds.updateExpandState(parentId, true);
-        }
+        // 스크롤해서 input이 보이게
+        input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        input.focus();
 
         var done = false;
 
