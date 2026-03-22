@@ -42,6 +42,32 @@
     z-index: 10;
 }
 
+/* ── 자식 모드 (홀드 0.8초 후) - 점선 + 라벨 ── */
+.task-node-self.drop-inside {
+    position: relative;
+    background-color: rgba(59, 130, 246, 0.08) !important;
+    outline: 2px dashed #3b82f6;
+    outline-offset: -2px;
+    border-top-color: transparent !important;
+    border-bottom-color: transparent !important;
+}
+
+.task-node-self.drop-inside::after {
+    content: '▸ 하위로 이동';
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #3b82f6;
+    color: white;
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    pointer-events: none;
+    z-index: 10;
+    white-space: nowrap;
+}
+
 /* ── 드롭 불가 ── */
 .task-node-self.drop-invalid {
     cursor: not-allowed;
