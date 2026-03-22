@@ -2,6 +2,9 @@ class TaskNodeRenderer {
     constructor(dataService, callbacks) {
         this.ds = dataService;
         this.cb = callbacks;
+        // 홀드 타이머 (자식 모드 전환용)
+        this._holdTimer = null;
+        this._holdTargetEl = null;
     }
 
     render(task, opts) {
@@ -104,7 +107,7 @@ class TaskNodeRenderer {
 
         selfEl.appendChild(card);
 
-        // Add child button (자식 추가는 이 버튼으로만)
+        // Add child button
         var addBtn = document.createElement('button');
         addBtn.className = 'action-btn add-btn';
         addBtn.textContent = '+';
@@ -127,6 +130,7 @@ class TaskNodeRenderer {
             self.cb.onDragStart(task.Id, selfEl);
         });
         selfEl.addEventListener('dragend', function() {
+            self._clearHoldTimer();
             self.cb.onDragEnd();
         });
         selfEl.addEventListener('dragover', function(e) {
@@ -135,11 +139,13 @@ class TaskNodeRenderer {
             self._handleDragOver(selfEl, task, e);
         });
         selfEl.addEventListener('dragleave', function() {
-            selfEl.classList.remove('drop-above', 'drop-below', 'drop-invalid');
+            self._clearHoldTimer();
+            selfEl.classList.remove('drop-above', 'drop-below', 'drop-inside', 'drop-invalid');
         });
         selfEl.addEventListener('drop', function(e) {
             e.preventDefault();
             e.stopPropagation();
+            self._clearHoldTimer();
             self._handleDrop(selfEl, task);
         });
 
@@ -165,17 +171,31 @@ class TaskNodeRenderer {
         return nodeEl;
     }
 
-    // ★ 핵심 변경: 2등분만 — Above 또는 Below (Inside 없음)
+    _clearHoldTimer() {
+        if (this._holdTimer) {
+            clearTimeout(this._holdTimer);
+            this._holdTimer = null;
+        }
+        this._holdTargetEl = null;
+    }
+
     _handleDragOver(selfEl, task, e) {
         var draggedId = this.cb.getDraggedId();
         if (!draggedId || draggedId === task.Id) {
-            selfEl.classList.remove('drop-above', 'drop-below');
+            this._clearHoldTimer();
+            selfEl.classList.remove('drop-above', 'drop-below', 'drop-inside');
             selfEl.classList.add('drop-invalid');
             return;
         }
         if (this._isDescendant(task.Id, draggedId)) {
-            selfEl.classList.remove('drop-above', 'drop-below');
+            this._clearHoldTimer();
+            selfEl.classList.remove('drop-above', 'drop-below', 'drop-inside');
             selfEl.classList.add('drop-invalid');
+            return;
+        }
+
+        // 이미 자식 모드(hold 완료)이면 유지
+        if (selfEl.classList.contains('drop-inside')) {
             return;
         }
 
@@ -185,28 +205,40 @@ class TaskNodeRenderer {
         var offsetY = e.clientY - rect.top;
         var height = rect.height;
 
-        // 상위 50% = Above (형제, 위에 삽입)
-        // 하위 50% = Below (형제, 아래에 삽입)
+        // 기본: 상위 50% = Above, 하위 50% = Below
         if (offsetY < height * 0.5) {
             selfEl.classList.add('drop-above');
         } else {
             selfEl.classList.add('drop-below');
         }
+
+        // 홀드 타이머: 같은 타겟에 머물면 0.8초 후 자식 모드 전환
+        var self = this;
+        if (this._holdTargetEl !== selfEl) {
+            this._clearHoldTimer();
+            this._holdTargetEl = selfEl;
+            this._holdTimer = setTimeout(function() {
+                selfEl.classList.remove('drop-above', 'drop-below', 'drop-invalid');
+                selfEl.classList.add('drop-inside');
+                self._holdTimer = null;
+            }, 800);
+        }
     }
 
-    // ★ 핵심 변경: Inside 판정 제거 — 항상 형제 이동만
     _handleDrop(selfEl, targetTask) {
         if (selfEl.classList.contains('drop-invalid')) {
-            selfEl.classList.remove('drop-above', 'drop-below', 'drop-invalid');
+            selfEl.classList.remove('drop-above', 'drop-below', 'drop-inside', 'drop-invalid');
             return;
         }
 
         var position = 'Below';
-        if (selfEl.classList.contains('drop-above')) {
+        if (selfEl.classList.contains('drop-inside')) {
+            position = 'Inside';
+        } else if (selfEl.classList.contains('drop-above')) {
             position = 'Above';
         }
 
-        selfEl.classList.remove('drop-above', 'drop-below', 'drop-invalid');
+        selfEl.classList.remove('drop-above', 'drop-below', 'drop-inside', 'drop-invalid');
         this.cb.onDrop(targetTask.Id, position);
     }
 
