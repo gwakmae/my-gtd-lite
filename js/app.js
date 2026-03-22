@@ -51,9 +51,18 @@ const app = {
         this._render();
     },
 
+    // 카카오톡 등 인앱 브라우저 감지
+    _isInAppBrowser() {
+        var ua = navigator.userAgent || '';
+        return /KAKAOTALK|NAVER|Line|Instagram|FB_IAB|FBAN|Twitter/i.test(ua);
+    },
+
     _setupFirebaseAuth() {
         var fb = window._firebase;
         if (!fb) return;
+
+        // 브라우저 닫아도 로그인 유지
+        fb.auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
 
         fb.auth.onAuthStateChanged(async (user) => {
             if (user) {
@@ -76,13 +85,38 @@ const app = {
         if (loginBtn) {
             loginBtn.addEventListener('click', async () => {
                 try {
-                    await fb.auth.signInWithPopup(fb.provider);
+                    if (this._isInAppBrowser()) {
+                        // 인앱 브라우저: 리다이렉트 방식
+                        await fb.auth.signInWithRedirect(fb.provider);
+                    } else {
+                        // 일반 브라우저: 팝업 방식
+                        await fb.auth.signInWithPopup(fb.provider);
+                    }
                 } catch (e) {
                     console.error('[Auth] Login error:', e);
-                    this.toast.error('로그인 실패: ' + e.message);
+                    // 팝업 차단된 경우 리다이렉트로 재시도
+                    if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
+                        try {
+                            await fb.auth.signInWithRedirect(fb.provider);
+                        } catch (e2) {
+                            this.toast.error('로그인 실패: ' + e2.message);
+                        }
+                    } else {
+                        this.toast.error('로그인 실패: ' + e.message);
+                    }
                 }
             });
         }
+
+        // 리다이렉트 결과 처리
+        fb.auth.getRedirectResult().then(function(result) {
+            // onAuthStateChanged에서 처리됨
+        }).catch((e) => {
+            if (e.code && e.code !== 'auth/no-auth-event') {
+                console.error('[Auth] Redirect error:', e);
+                this.toast.error('로그인 실패: ' + e.message);
+            }
+        });
     },
 
     navigate(route, context) {
@@ -90,7 +124,6 @@ const app = {
         this.currentContext = context || '';
         this._render();
         this._renderSidebar();
-        // 모바일에서 네비게이션 후 사이드바 닫기
         var sidebar = document.getElementById('sidebar');
         var overlay = document.getElementById('sidebar-overlay');
         if (sidebar) sidebar.classList.remove('is-open');
@@ -152,14 +185,12 @@ const app = {
 
         nav.innerHTML = html;
 
-        // 네비게이션 이벤트 연결
         nav.querySelectorAll('[data-route]').forEach(function(btn) {
             btn.addEventListener('click', () => {
                 app.navigate(btn.dataset.route, btn.dataset.context);
             });
         });
 
-        // 로그아웃 버튼
         var logoutBtn = document.getElementById('nav-logout');
         if (logoutBtn) {
             logoutBtn.addEventListener('click', async () => {
@@ -172,7 +203,6 @@ const app = {
             });
         }
 
-        // 사이드바 로그인 버튼
         var navLoginBtn = document.getElementById('nav-login');
         if (navLoginBtn) {
             navLoginBtn.addEventListener('click', () => {
