@@ -8,7 +8,7 @@ class DataService {
         // Firebase state
         this._useFirebase = false;
         this._userId = null;
-        this._unsubscribe = null; // Firestore listener
+        this._unsubscribe = null;
         this._syncStatus = document.getElementById('sync-status');
         this._offlineBadge = document.getElementById('offline-badge');
         this._isSyncing = false;
@@ -20,57 +20,52 @@ class DataService {
 
     // ─── Init ───
     init() {
-        // Always load from localStorage first (fast start)
         this._loadFromLocalStorage();
     }
 
-    // ─── Firebase Setup (called from app.js after auth) ───
+    // ─── Firebase Setup ───
     async enableFirebase(userId) {
         this._useFirebase = true;
         this._userId = userId;
         this._setSyncStatus('동기화 중...');
 
-        const fb = window._firebase;
-        const docRef = fb.doc(fb.db, 'users', userId, 'data', 'tasks');
+        var fb = window._firebase;
+        var docRef = fb.db.collection('users').doc(userId).collection('data').doc('tasks');
 
         try {
-            // Load from Firestore
-            const snap = await fb.getDoc(docRef);
-            if (snap.exists()) {
-                const data = snap.data();
-                const remoteTasks = (data.tasks || []).map(t => new TaskItem(t));
+            var snap = await docRef.get();
+            if (snap.exists) {
+                var data = snap.data();
+                var remoteTasks = (data.tasks || []).map(function(t) { return new TaskItem(t); });
 
                 if (remoteTasks.length > 0) {
-                    // Merge: remote wins, but keep local-only tasks
                     this._tasks = remoteTasks;
                     this._recalcNextId();
-                    this._saveToLocalStorage(); // cache locally
+                    this._saveToLocalStorage();
                     this._notify();
                     this._setSyncStatus('✓ 동기화 완료');
                 } else if (this._tasks.length > 0) {
-                    // Remote is empty, push local data up
                     await this._saveToFirestore();
                     this._setSyncStatus('✓ 업로드 완료');
                 }
             } else {
-                // No remote data, push local up
                 if (this._tasks.length > 0) {
                     await this._saveToFirestore();
                     this._setSyncStatus('✓ 초기 업로드 완료');
                 }
             }
 
-            // Listen for real-time changes
-            this._unsubscribe = fb.onSnapshot(docRef, (snap) => {
-                if (this._isSyncing) return; // ignore our own writes
-                if (snap.exists()) {
-                    const data = snap.data();
-                    const remoteTasks = (data.tasks || []).map(t => new TaskItem(t));
-                    this._tasks = remoteTasks;
-                    this._recalcNextId();
-                    this._saveToLocalStorage();
-                    this._notify();
-                    this._setSyncStatus('✓ 실시간 동기화');
+            var self = this;
+            this._unsubscribe = docRef.onSnapshot(function(snap) {
+                if (self._isSyncing) return;
+                if (snap.exists) {
+                    var data = snap.data();
+                    var remoteTasks = (data.tasks || []).map(function(t) { return new TaskItem(t); });
+                    self._tasks = remoteTasks;
+                    self._recalcNextId();
+                    self._saveToLocalStorage();
+                    self._notify();
+                    self._setSyncStatus('✓ 실시간 동기화');
                 }
             });
 
@@ -94,20 +89,21 @@ class DataService {
     _setSyncStatus(msg) {
         if (this._syncStatus) this._syncStatus.textContent = msg;
         if (msg) {
+            var self = this;
             clearTimeout(this._syncClearTimer);
-            this._syncClearTimer = setTimeout(() => {
-                if (this._syncStatus) this._syncStatus.textContent = '';
+            this._syncClearTimer = setTimeout(function() {
+                if (self._syncStatus) self._syncStatus.textContent = '';
             }, 5000);
         }
     }
 
     // ─── Load / Save ───
     _loadFromLocalStorage() {
-        const saved = localStorage.getItem(this._storageKey);
+        var saved = localStorage.getItem(this._storageKey);
         if (saved) {
             try {
-                const parsed = JSON.parse(saved);
-                this._tasks = (parsed.tasks || parsed).map(t => new TaskItem(t));
+                var parsed = JSON.parse(saved);
+                this._tasks = (parsed.tasks || parsed).map(function(t) { return new TaskItem(t); });
             } catch (e) {
                 console.error('Failed to parse saved data:', e);
                 this._tasks = [];
@@ -120,11 +116,11 @@ class DataService {
     }
 
     _loadEmbeddedData() {
-        const el = document.getElementById('embedded-sample');
+        var el = document.getElementById('embedded-sample');
         if (el) {
             try {
-                const data = JSON.parse(el.textContent);
-                this._tasks = (data.tasks || data).map(t => new TaskItem(t));
+                var data = JSON.parse(el.textContent);
+                this._tasks = (data.tasks || data).map(function(t) { return new TaskItem(t); });
                 return;
             } catch (e) { console.error('Embedded data parse error:', e); }
         }
@@ -146,7 +142,7 @@ class DataService {
 
     _recalcNextId() {
         if (this._tasks.length > 0) {
-            this._nextId = Math.max(...this._tasks.map(t => t.Id)) + 1;
+            this._nextId = Math.max.apply(null, this._tasks.map(function(t) { return t.Id; })) + 1;
         }
     }
 
@@ -158,9 +154,9 @@ class DataService {
     }
 
     _saveToLocalStorage() {
-        const data = {
-            tasks: this._tasks.map(t => {
-                const plain = { ...t };
+        var data = {
+            tasks: this._tasks.map(function(t) {
+                var plain = Object.assign({}, t);
                 delete plain.Children;
                 return plain;
             })
@@ -170,11 +166,11 @@ class DataService {
 
     async _saveToFirestore() {
         if (!this._useFirebase || !this._userId) return;
-        const fb = window._firebase;
-        const docRef = fb.doc(fb.db, 'users', this._userId, 'data', 'tasks');
-        const data = {
-            tasks: this._tasks.map(t => {
-                const plain = { ...t };
+        var fb = window._firebase;
+        var docRef = fb.db.collection('users').doc(this._userId).collection('data').doc('tasks');
+        var data = {
+            tasks: this._tasks.map(function(t) {
+                var plain = Object.assign({}, t);
                 delete plain.Children;
                 return plain;
             }),
@@ -182,7 +178,7 @@ class DataService {
         };
         try {
             this._isSyncing = true;
-            await fb.setDoc(docRef, data);
+            await docRef.set(data);
             this._isSyncing = false;
             this._setSyncStatus('✓ 저장됨');
         } catch (e) {
@@ -195,20 +191,27 @@ class DataService {
     _saveAndNotify() { this.save(); this._notify(); }
 
     // ─── Tree Building ───
-    buildTree() {
-        const map = {};
-        this._tasks.forEach(t => { t.Children = []; map[t.Id] = t; });
-        const roots = [];
-        this._tasks.forEach(t => {
+    // ★ 수정: taskList 파라미터를 받으면 해당 목록만으로 트리 빌드 ★
+    buildTree(taskList) {
+        var source = taskList || this._tasks;
+        var map = {};
+        var sourceIds = new Set();
+        source.forEach(function(t) {
+            t.Children = [];
+            map[t.Id] = t;
+            sourceIds.add(t.Id);
+        });
+        var roots = [];
+        source.forEach(function(t) {
             if (t.ParentId != null && map[t.ParentId]) {
                 map[t.ParentId].Children.push(t);
             } else {
                 roots.push(t);
             }
         });
-        const sortRec = (items) => {
-            items.sort((a, b) => a.SortOrder - b.SortOrder);
-            items.forEach(i => sortRec(i.Children));
+        var sortRec = function(items) {
+            items.sort(function(a, b) { return a.SortOrder - b.SortOrder; });
+            items.forEach(function(i) { sortRec(i.Children); });
         };
         sortRec(roots);
         return roots;
@@ -217,45 +220,49 @@ class DataService {
     // ─── Queries ───
     getAllTasks() { return this.buildTree(); }
     getRawTasks() { return this._tasks; }
-    getById(id) { return this._tasks.find(t => t.Id === id) || null; }
+    getById(id) { return this._tasks.find(function(t) { return t.Id === id; }) || null; }
 
+    // ★ 수정: status별 태스크를 가져올 때 해당 status의 태스크만 필터링 후 트리 빌드 ★
     getTasksForStatus(status) {
-        return this.buildTree().filter(t => t.Status === status);
+        // 해당 status의 모든 태스크 (부모+자식 모두)
+        var statusTasks = this._tasks.filter(function(t) { return t.Status === status; });
+        return this.buildTree(statusTasks);
     }
 
     getTodayTasks() {
-        const today = new Date(); today.setHours(0, 0, 0, 0);
-        return this._tasks.filter(t =>
-            !t.IsCompleted && t.StartDate && new Date(t.StartDate) <= today
-        ).sort((a, b) => {
-            const da = a.DueDate ? new Date(a.DueDate) : new Date(9999, 0);
-            const db = b.DueDate ? new Date(b.DueDate) : new Date(9999, 0);
+        var today = new Date(); today.setHours(0, 0, 0, 0);
+        return this._tasks.filter(function(t) {
+            return !t.IsCompleted && t.StartDate && new Date(t.StartDate) <= today;
+        }).sort(function(a, b) {
+            var da = a.DueDate ? new Date(a.DueDate) : new Date(9999, 0);
+            var db = b.DueDate ? new Date(b.DueDate) : new Date(9999, 0);
             return da - db;
         });
     }
 
     getFocusTasks() {
-        const soon = new Date();
+        var soon = new Date();
         soon.setDate(soon.getDate() + 3);
         soon.setHours(23, 59, 59);
-        return this._tasks.filter(t =>
-            !t.IsCompleted &&
-            (t.Priority === Priority.High || (t.DueDate && new Date(t.DueDate) <= soon))
-        ).sort((a, b) => {
-            const da = a.DueDate ? new Date(a.DueDate) : new Date(9999, 0);
-            const db = b.DueDate ? new Date(b.DueDate) : new Date(9999, 0);
+        return this._tasks.filter(function(t) {
+            return !t.IsCompleted &&
+                (t.Priority === Priority.High || (t.DueDate && new Date(t.DueDate) <= soon));
+        }).sort(function(a, b) {
+            var da = a.DueDate ? new Date(a.DueDate) : new Date(9999, 0);
+            var db = b.DueDate ? new Date(b.DueDate) : new Date(9999, 0);
             if (da - db !== 0) return da - db;
             return PriorityList.indexOf(b.Priority) - PriorityList.indexOf(a.Priority);
         });
     }
 
     getActiveTasks(showHidden) {
-        const today = new Date(); today.setHours(0, 0, 0, 0);
-        const tree = this.buildTree();
-        const result = [];
-        const walk = (items, parentHidden) => {
-            for (const t of items) {
-                const hidden = parentHidden || t.IsHidden;
+        var today = new Date(); today.setHours(0, 0, 0, 0);
+        var tree = this.buildTree();
+        var result = [];
+        var walk = function(items, parentHidden) {
+            for (var i = 0; i < items.length; i++) {
+                var t = items[i];
+                var hidden = parentHidden || t.IsHidden;
                 if (showHidden || !hidden) {
                     if (t.Status !== TaskStatus.Inbox &&
                         t.Children.length === 0 &&
@@ -272,25 +279,25 @@ class DataService {
     }
 
     getTasksByContext(context) {
-        return this._tasks.filter(t =>
-            !t.IsCompleted && t.Contexts.some(c => c.toLowerCase() === context.toLowerCase())
-        ).sort((a, b) => {
-            const si = TaskStatusList.indexOf(a.Status) - TaskStatusList.indexOf(b.Status);
+        return this._tasks.filter(function(t) {
+            return !t.IsCompleted && t.Contexts.some(function(c) { return c.toLowerCase() === context.toLowerCase(); });
+        }).sort(function(a, b) {
+            var si = TaskStatusList.indexOf(a.Status) - TaskStatusList.indexOf(b.Status);
             return si !== 0 ? si : a.SortOrder - b.SortOrder;
         });
     }
 
     getAllContexts() {
-        const ctxSet = new Set();
-        this._tasks.forEach(t => t.Contexts.forEach(c => ctxSet.add(c)));
-        return [...ctxSet].sort();
+        var ctxSet = new Set();
+        this._tasks.forEach(function(t) { t.Contexts.forEach(function(c) { ctxSet.add(c); }); });
+        return Array.from(ctxSet).sort();
     }
 
     // ─── Mutations ───
     addTask(title, status, parentId) {
-        const siblings = this._tasks.filter(t => t.ParentId === parentId && t.Status === status);
-        const maxSort = siblings.length > 0 ? Math.max(...siblings.map(s => s.SortOrder)) : -1;
-        const task = new TaskItem({
+        var siblings = this._tasks.filter(function(t) { return t.ParentId === parentId && t.Status === status; });
+        var maxSort = siblings.length > 0 ? Math.max.apply(null, siblings.map(function(s) { return s.SortOrder; })) : -1;
+        var task = new TaskItem({
             Id: this._nextId++,
             Title: title,
             Status: status,
@@ -303,12 +310,12 @@ class DataService {
     }
 
     updateTask(updated) {
-        const idx = this._tasks.findIndex(t => t.Id === updated.Id);
+        var idx = this._tasks.findIndex(function(t) { return t.Id === updated.Id; });
         if (idx === -1) return;
-        const old = this._tasks[idx];
-        const hiddenChanged = old.IsHidden !== updated.IsHidden;
+        var old = this._tasks[idx];
+        var hiddenChanged = old.IsHidden !== updated.IsHidden;
 
-        const children = this._tasks[idx].Children;
+        var children = this._tasks[idx].Children;
         Object.assign(this._tasks[idx], updated);
         this._tasks[idx].Children = children || [];
 
@@ -319,66 +326,71 @@ class DataService {
     }
 
     _cascadeHidden(parentId, isHidden) {
-        const children = this._tasks.filter(t => t.ParentId === parentId);
-        for (const c of children) {
-            c.IsHidden = isHidden;
-            this._cascadeHidden(c.Id, isHidden);
+        var self = this;
+        var children = this._tasks.filter(function(t) { return t.ParentId === parentId; });
+        for (var i = 0; i < children.length; i++) {
+            children[i].IsHidden = isHidden;
+            self._cascadeHidden(children[i].Id, isHidden);
         }
     }
 
     deleteTask(id) {
-        const snapshot = this._captureSubtree([id]);
+        var snapshot = this._captureSubtree([id]);
         this._deleteRecursive(id);
         this._saveAndNotify();
         return snapshot;
     }
 
     deleteTasks(ids) {
-        const snapshot = this._captureSubtree(ids);
-        for (const id of ids) this._deleteRecursive(id);
+        var snapshot = this._captureSubtree(ids);
+        for (var i = 0; i < ids.length; i++) this._deleteRecursive(ids[i]);
         this._saveAndNotify();
         return snapshot;
     }
 
     _deleteRecursive(id) {
-        const children = this._tasks.filter(t => t.ParentId === id);
-        for (const c of children) this._deleteRecursive(c.Id);
-        this._tasks = this._tasks.filter(t => t.Id !== id);
+        var self = this;
+        var children = this._tasks.filter(function(t) { return t.ParentId === id; });
+        for (var i = 0; i < children.length; i++) self._deleteRecursive(children[i].Id);
+        this._tasks = this._tasks.filter(function(t) { return t.Id !== id; });
     }
 
     _captureSubtree(rootIds) {
-        const result = [];
-        const seen = new Set();
-        const collect = (id) => {
+        var result = [];
+        var seen = new Set();
+        var self = this;
+        var collect = function(id) {
             if (seen.has(id)) return;
             seen.add(id);
-            const t = this._tasks.find(x => x.Id === id);
+            var t = self._tasks.find(function(x) { return x.Id === id; });
             if (t) {
                 result.push(t.clone());
-                this._tasks.filter(x => x.ParentId === id).forEach(c => collect(c.Id));
+                self._tasks.filter(function(x) { return x.ParentId === id; }).forEach(function(c) { collect(c.Id); });
             }
         };
-        rootIds.forEach(id => collect(id));
+        rootIds.forEach(function(id) { collect(id); });
         return result;
     }
 
     restoreTasks(snapshot) {
-        for (const t of snapshot) {
-            this._tasks = this._tasks.filter(x => x.Id !== t.Id);
-            this._tasks.push(new TaskItem(t));
+        var self = this;
+        for (var i = 0; i < snapshot.length; i++) {
+            self._tasks = self._tasks.filter(function(x) { return x.Id !== snapshot[i].Id; });
+            self._tasks.push(new TaskItem(snapshot[i]));
         }
-        this._nextId = Math.max(this._nextId, ...this._tasks.map(t => t.Id)) + 1;
+        this._nextId = Math.max(this._nextId, Math.max.apply(null, this._tasks.map(function(t) { return t.Id; }))) + 1;
         this._saveAndNotify();
     }
 
     toggleComplete(id) {
-        const task = this.getById(id);
+        var task = this.getById(id);
         if (!task) return;
 
-        const completed = !task.IsCompleted;
-        const seen = new Set();
+        var completed = !task.IsCompleted;
+        var seen = new Set();
+        var self = this;
 
-        const updateRec = (t, isCompleted) => {
+        var updateRec = function(t, isCompleted) {
             if (seen.has(t.Id)) return;
             seen.add(t.Id);
             t.IsCompleted = isCompleted;
@@ -389,16 +401,16 @@ class DataService {
                 t.Status = t.OriginalStatus || TaskStatus.NextActions;
                 t.OriginalStatus = null;
             }
-            this._tasks.filter(c => c.ParentId === t.Id).forEach(c => updateRec(c, isCompleted));
+            self._tasks.filter(function(c) { return c.ParentId === t.Id; }).forEach(function(c) { updateRec(c, isCompleted); });
         };
 
         updateRec(task, completed);
 
         if (completed && task.ParentId != null) {
-            let parent = this.getById(task.ParentId);
+            var parent = this.getById(task.ParentId);
             while (parent && !parent.IsCompleted) {
-                const siblings = this._tasks.filter(t => t.ParentId === parent.Id);
-                if (siblings.every(s => s.IsCompleted)) {
+                var siblings = this._tasks.filter(function(t) { return t.ParentId === parent.Id; });
+                if (siblings.every(function(s) { return s.IsCompleted; })) {
                     updateRec(parent, true);
                     parent = parent.ParentId != null ? this.getById(parent.ParentId) : null;
                 } else { break; }
@@ -410,153 +422,126 @@ class DataService {
     moveTasks(taskIds, newStatus, newParentId, newSortOrder) {
         if (!Array.isArray(taskIds) || taskIds.length === 0) return;
 
-        const selectedSet = new Set(taskIds);
+        var selectedSet = new Set(taskIds);
 
-        // 선택된 항목 중 "루트로 움직일 항목"만 추림
-        const rootTasks = this._tasks
-            .filter(t => selectedSet.has(t.Id) && (t.ParentId == null || !selectedSet.has(t.ParentId)))
-            .sort((a, b) => a.SortOrder - b.SortOrder);
+        var rootTasks = this._tasks
+            .filter(function(t) { return selectedSet.has(t.Id) && (t.ParentId == null || !selectedSet.has(t.ParentId)); })
+            .sort(function(a, b) { return a.SortOrder - b.SortOrder; });
 
         if (rootTasks.length === 0) return;
 
-        const movingRootIds = new Set(rootTasks.map(t => t.Id));
+        var movingRootIds = new Set(rootTasks.map(function(t) { return t.Id; }));
 
-        // 현재 소속 그룹 기록 (이동 후 source 그룹 재정렬용)
-        const sourceGroups = new Set(
-            rootTasks.map(t => this._groupKey(t.ParentId, t.Status))
+        var self = this;
+        var sourceGroups = new Set(
+            rootTasks.map(function(t) { return self._groupKey(t.ParentId, t.Status); })
         );
 
-        // 문자열 드롭 위치(Above/Below/Inside)를 실제 parentId/sortOrder로 변환
-        const resolved = this._resolveDropLocation(rootTasks, newStatus, newParentId, newSortOrder);
+        var resolved = this._resolveDropLocation(rootTasks, newStatus, newParentId, newSortOrder);
         if (!resolved) return;
 
         newStatus = resolved.status;
         newParentId = resolved.parentId;
         newSortOrder = resolved.sortOrder;
 
-        // 자기 자신/자기 자손 아래로 이동 금지
         if (newParentId != null) {
-            const allDesc = this._getAllDescendantIds([...movingRootIds]);
+            var allDesc = this._getAllDescendantIds(Array.from(movingRootIds));
             if (allDesc.has(newParentId) || movingRootIds.has(newParentId)) {
                 return;
             }
         }
 
-        // 루트 + 자손들의 status 업데이트
-        const allAffectedIds = this._getAllDescendantIds([...movingRootIds]);
-        for (const t of this._tasks) {
-            if (allAffectedIds.has(t.Id)) {
-                t.Status = newStatus;
+        var allAffectedIds = this._getAllDescendantIds(Array.from(movingRootIds));
+        for (var i = 0; i < this._tasks.length; i++) {
+            if (allAffectedIds.has(this._tasks[i].Id)) {
+                this._tasks[i].Status = newStatus;
             }
         }
 
-        // 루트 태스크들의 부모 변경
-        for (const rt of rootTasks) {
-            rt.ParentId = newParentId;
+        for (var i = 0; i < rootTasks.length; i++) {
+            rootTasks[i].ParentId = newParentId;
         }
 
-        // 1) source 그룹 재정렬
-        for (const key of sourceGroups) {
-            const group = this._parseGroupKey(key);
-
+        sourceGroups.forEach(function(key) {
+            var group = self._parseGroupKey(key);
             if (group.parentId === newParentId && group.status === newStatus) {
-                continue;
+                return;
             }
-
-            const remaining = this._tasks
-                .filter(t =>
-                    t.ParentId === group.parentId &&
-                    t.Status === group.status &&
-                    !movingRootIds.has(t.Id)
-                )
-                .sort((a, b) => a.SortOrder - b.SortOrder);
-
-            remaining.forEach((t, i) => {
-                t.SortOrder = i;
-            });
-        }
-
-        // 2) destination 그룹에 정확한 위치로 삽입
-        const destSiblings = this._tasks
-            .filter(t =>
-                t.ParentId === newParentId &&
-                t.Status === newStatus &&
-                !movingRootIds.has(t.Id)
-            )
-            .sort((a, b) => a.SortOrder - b.SortOrder);
-
-        const insertIndex = Math.max(0, Math.min(Number(newSortOrder), destSiblings.length));
-        destSiblings.splice(insertIndex, 0, ...rootTasks);
-
-        destSiblings.forEach((t, i) => {
-            t.SortOrder = i;
+            var remaining = self._tasks
+                .filter(function(t) {
+                    return t.ParentId === group.parentId &&
+                        t.Status === group.status &&
+                        !movingRootIds.has(t.Id);
+                })
+                .sort(function(a, b) { return a.SortOrder - b.SortOrder; });
+            remaining.forEach(function(t, i) { t.SortOrder = i; });
         });
+
+        var destSiblings = this._tasks
+            .filter(function(t) {
+                return t.ParentId === newParentId &&
+                    t.Status === newStatus &&
+                    !movingRootIds.has(t.Id);
+            })
+            .sort(function(a, b) { return a.SortOrder - b.SortOrder; });
+
+        var insertIndex = Math.max(0, Math.min(Number(newSortOrder), destSiblings.length));
+        var args = [insertIndex, 0].concat(rootTasks);
+        Array.prototype.splice.apply(destSiblings, args);
+
+        destSiblings.forEach(function(t, i) { t.SortOrder = i; });
 
         this._saveAndNotify();
     }
 
     _resolveDropLocation(rootTasks, status, parentIdOrTargetId, sortOrderOrPosition) {
-        const movingRootIds = new Set(rootTasks.map(t => t.Id));
+        var movingRootIds = new Set(rootTasks.map(function(t) { return t.Id; }));
 
-        // 기존 numeric 호출도 계속 지원
         if (typeof sortOrderOrPosition === 'number' && Number.isFinite(sortOrderOrPosition)) {
             return {
-                status,
+                status: status,
                 parentId: parentIdOrTargetId,
                 sortOrder: sortOrderOrPosition
             };
         }
 
-        const position = sortOrderOrPosition;
+        var position = sortOrderOrPosition;
 
-        // 컬럼 빈 공간/컬럼 body 드롭
         if (position === 'Inside' && parentIdOrTargetId == null) {
-            const siblings = this._tasks
-                .filter(t =>
-                    t.ParentId == null &&
-                    t.Status === status &&
-                    !movingRootIds.has(t.Id)
-                )
-                .sort((a, b) => a.SortOrder - b.SortOrder);
-
-            return {
-                status,
-                parentId: null,
-                sortOrder: siblings.length
-            };
+            var siblings = this._tasks
+                .filter(function(t) {
+                    return t.ParentId == null &&
+                        t.Status === status &&
+                        !movingRootIds.has(t.Id);
+                })
+                .sort(function(a, b) { return a.SortOrder - b.SortOrder; });
+            return { status: status, parentId: null, sortOrder: siblings.length };
         }
 
-        const targetTask = this.getById(parentIdOrTargetId);
+        var targetTask = this.getById(parentIdOrTargetId);
         if (!targetTask) return null;
 
-        // target 안으로 넣기 = target의 마지막 자식
         if (position === 'Inside') {
-            const children = this._tasks
-                .filter(t =>
-                    t.ParentId === targetTask.Id &&
-                    t.Status === targetTask.Status &&
-                    !movingRootIds.has(t.Id)
-                )
-                .sort((a, b) => a.SortOrder - b.SortOrder);
-
-            return {
-                status: targetTask.Status,
-                parentId: targetTask.Id,
-                sortOrder: children.length
-            };
+            var children = this._tasks
+                .filter(function(t) {
+                    return t.ParentId === targetTask.Id &&
+                        t.Status === targetTask.Status &&
+                        !movingRootIds.has(t.Id);
+                })
+                .sort(function(a, b) { return a.SortOrder - b.SortOrder; });
+            return { status: targetTask.Status, parentId: targetTask.Id, sortOrder: children.length };
         }
 
-        // Above / Below = target의 형제 위치
-        const actualParentId = targetTask.ParentId;
-        const siblings = this._tasks
-            .filter(t =>
-                t.ParentId === actualParentId &&
-                t.Status === targetTask.Status &&
-                !movingRootIds.has(t.Id)
-            )
-            .sort((a, b) => a.SortOrder - b.SortOrder);
+        var actualParentId = targetTask.ParentId;
+        var siblings = this._tasks
+            .filter(function(t) {
+                return t.ParentId === actualParentId &&
+                    t.Status === targetTask.Status &&
+                    !movingRootIds.has(t.Id);
+            })
+            .sort(function(a, b) { return a.SortOrder - b.SortOrder; });
 
-        const targetIndex = siblings.findIndex(t => t.Id === targetTask.Id);
+        var targetIndex = siblings.findIndex(function(t) { return t.Id === targetTask.Id; });
         if (targetIndex === -1) return null;
 
         return {
@@ -567,23 +552,24 @@ class DataService {
     }
 
     _groupKey(parentId, status) {
-        return `${parentId == null ? 'null' : parentId}::${status}`;
+        return (parentId == null ? 'null' : parentId) + '::' + status;
     }
 
     _parseGroupKey(key) {
-        const [parentRaw, status] = key.split('::');
+        var parts = key.split('::');
         return {
-            parentId: parentRaw === 'null' ? null : Number(parentRaw),
-            status
+            parentId: parts[0] === 'null' ? null : Number(parts[0]),
+            status: parts[1]
         };
     }
 
     _getAllDescendantIds(rootIds) {
-        const result = new Set(rootIds);
-        const queue = [...rootIds];
+        var result = new Set(rootIds);
+        var queue = rootIds.slice();
+        var self = this;
         while (queue.length > 0) {
-            const pid = queue.shift();
-            this._tasks.filter(t => t.ParentId === pid).forEach(c => {
+            var pid = queue.shift();
+            self._tasks.filter(function(t) { return t.ParentId === pid; }).forEach(function(c) {
                 if (!result.has(c.Id)) {
                     result.add(c.Id);
                     queue.push(c.Id);
@@ -594,37 +580,38 @@ class DataService {
     }
 
     bulkUpdate(model) {
-        const tasksToUpdate = this._tasks.filter(t => model.taskIds.includes(t.Id));
-        for (const task of tasksToUpdate) {
+        var tasksToUpdate = this._tasks.filter(function(t) { return model.taskIds.includes(t.Id); });
+        for (var i = 0; i < tasksToUpdate.length; i++) {
+            var task = tasksToUpdate[i];
             if (model.dueDate) task.DueDate = model.dueDate;
             if (model.priority) task.Priority = model.priority;
             if (model.contextToAdd) {
-                const c = model.contextToAdd.startsWith('@') ? model.contextToAdd : `@${model.contextToAdd}`;
+                var c = model.contextToAdd.startsWith('@') ? model.contextToAdd : '@' + model.contextToAdd;
                 if (!task.Contexts.includes(c)) task.Contexts.push(c);
             }
             if (model.contextToRemove) {
-                const c = model.contextToRemove.startsWith('@') ? model.contextToRemove : `@${model.contextToRemove}`;
-                task.Contexts = task.Contexts.filter(x => x !== c);
+                var c = model.contextToRemove.startsWith('@') ? model.contextToRemove : '@' + model.contextToRemove;
+                task.Contexts = task.Contexts.filter(function(x) { return x !== c; });
             }
         }
         this._saveAndNotify();
     }
 
     deleteAllCompleted() {
-        const completedIds = this._tasks.filter(t => t.Status === TaskStatus.Completed).map(t => t.Id);
-        for (const id of completedIds) this._deleteRecursive(id);
+        var completedIds = this._tasks.filter(function(t) { return t.Status === TaskStatus.Completed; }).map(function(t) { return t.Id; });
+        for (var i = 0; i < completedIds.length; i++) this._deleteRecursive(completedIds[i]);
         this._saveAndNotify();
     }
 
     deleteContext(context) {
-        this._tasks.forEach(t => {
-            t.Contexts = t.Contexts.filter(c => c !== context);
+        this._tasks.forEach(function(t) {
+            t.Contexts = t.Contexts.filter(function(c) { return c !== context; });
         });
         this._saveAndNotify();
     }
 
     updateExpandState(taskId, isExpanded) {
-        const t = this.getById(taskId);
+        var t = this.getById(taskId);
         if (t) {
             t.IsExpanded = isExpanded;
             this.save();
@@ -633,9 +620,9 @@ class DataService {
 
     // ─── Import / Export ───
     exportToJson() {
-        const data = {
-            tasks: this._tasks.map(t => {
-                const plain = { ...t };
+        var data = {
+            tasks: this._tasks.map(function(t) {
+                var plain = Object.assign({}, t);
                 delete plain.Children;
                 return plain;
             })
@@ -644,29 +631,29 @@ class DataService {
     }
 
     importFromJson(jsonStr) {
-        const data = JSON.parse(jsonStr);
-        const tasks = data.tasks || data;
+        var data = JSON.parse(jsonStr);
+        var tasks = data.tasks || data;
         if (!Array.isArray(tasks) || tasks.length === 0) {
             throw new Error('파일에 유효한 태스크 데이터가 없습니다.');
         }
         if (tasks.length > 1000) {
             throw new Error('태스크가 너무 많습니다 (최대 1000개).');
         }
-        const idSet = new Set();
-        for (const t of tasks) {
-            if (idSet.has(t.Id)) throw new Error(`ID ${t.Id} 중복`);
-            idSet.add(t.Id);
-            if (!t.Title || t.Title.trim() === '') throw new Error(`ID ${t.Id}의 제목이 비어있습니다.`);
+        var idSet = new Set();
+        for (var i = 0; i < tasks.length; i++) {
+            if (idSet.has(tasks[i].Id)) throw new Error('ID ' + tasks[i].Id + ' 중복');
+            idSet.add(tasks[i].Id);
+            if (!tasks[i].Title || tasks[i].Title.trim() === '') throw new Error('ID ' + tasks[i].Id + '의 제목이 비어있습니다.');
         }
-        this._tasks = tasks.map(t => new TaskItem(t));
-        this._nextId = Math.max(...this._tasks.map(t => t.Id)) + 1;
+        this._tasks = tasks.map(function(t) { return new TaskItem(t); });
+        this._nextId = Math.max.apply(null, this._tasks.map(function(t) { return t.Id; })) + 1;
         this._saveAndNotify();
     }
 
     findInTree(tree, id) {
-        for (const t of tree) {
-            if (t.Id === id) return t;
-            const found = this.findInTree(t.Children, id);
+        for (var i = 0; i < tree.length; i++) {
+            if (tree[i].Id === id) return tree[i];
+            var found = this.findInTree(tree[i].Children, id);
             if (found) return found;
         }
         return null;
