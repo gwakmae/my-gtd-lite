@@ -12,69 +12,91 @@ class BoardView {
         this.renderedTasks = [];
         this.hideCompleted = localStorage.getItem('gtd-hide-completed') === 'true';
         this.showHidden = localStorage.getItem('gtd-show-hidden') === 'true';
-        
+
+        var self = this;
+
         this.nodeRenderer = new TaskNodeRenderer(dataService, {
-            onTaskClick: (taskId, e) => {
-                const task = this.ds.getById(taskId);
-                if (task) this._handleTaskClick(task, e);
+            onTaskClick: function(taskId, e) {
+                var task = self.ds.getById(taskId);
+                if (task) self._handleTaskClick(task, e);
             },
-            onDoubleClick: (taskId) => {
-                const task = this.ds.getById(taskId);
-                if (task) this._openModal(task);
+            onDoubleClick: function(taskId) {
+                var task = self.ds.getById(taskId);
+                if (task) self._openModal(task);
             },
-            onToggleComplete: (taskId) => {
-                this.ds.toggleComplete(taskId);
+            onToggleComplete: function(taskId) {
+                self.ds.toggleComplete(taskId);
             },
-            onDelete: (taskId) => {
-                const task = this.ds.getById(taskId);
-                if (task) this._deleteTask(task);
+            onDelete: function(taskId) {
+                var task = self.ds.getById(taskId);
+                if (task) self._deleteTask(task);
             },
-            onAddChild: (taskId) => {
-                const task = this.ds.getById(taskId);
-                if (task) this._showChildQuickAdd(task);
+            onAddChild: function(taskId) {
+                var task = self.ds.getById(taskId);
+                if (task) self._showChildQuickAdd(task);
             },
-            onDragStart: (taskId, el) => {
-                this.dragDrop.setSelectedIds(this.selectedIds);
-                this.dragDrop.startDrag(taskId, el);
+            onDragStart: function(taskId, el) {
+                self.dragDrop.setSelectedIds(self.selectedIds);
+                self.dragDrop.startDrag(taskId, el);
             },
-            onDragEnd: () => this.dragDrop.endDrag(),
-            onDrop: (targetId, position) => this._handleDrop(targetId, position),
-            getDraggedId: () => this.dragDrop.getDraggedId(),
-            onRefresh: () => this.render()
+            onDragEnd: function() { self.dragDrop.endDrag(); },
+            onDrop: function(targetId, position) { self._handleDrop(targetId, position); },
+            getDraggedId: function() { return self.dragDrop.getDraggedId(); },
+            onRefresh: function() { self.render(); },
+            // ★ 모바일 터치: 칼럼 상단/빈 영역 드롭 콜백 ★
+            onDropColumnTop: function(status) {
+                var ids = self.dragDrop.getIdsToMove();
+                if (ids.length > 0 && status) {
+                    self.ds.moveTasks(ids, status, null, 0);
+                }
+                self.dragDrop.endDrag();
+            },
+            onDropColumnEmpty: function(status) {
+                var ids = self.dragDrop.getIdsToMove();
+                if (ids.length > 0 && status) {
+                    // 칼럼 빈 영역 = 맨 아래에 추가
+                    var siblings = self.ds.getRawTasks().filter(function(t) {
+                        return t.ParentId == null && t.Status === status;
+                    });
+                    self.ds.moveTasks(ids, status, null, siblings.length);
+                }
+                self.dragDrop.endDrag();
+            }
         });
     }
 
     render() {
-        const container = document.getElementById('content-area');
+        var container = document.getElementById('content-area');
         if (!container) return;
         container.innerHTML = '';
 
-        const wrapper = document.createElement('div');
+        var wrapper = document.createElement('div');
         wrapper.className = 'board-container';
 
-        const header = this._renderHeader();
+        var header = this._renderHeader();
         wrapper.appendChild(header);
 
-        const columnsRow = document.createElement('div');
+        var columnsRow = document.createElement('div');
         columnsRow.className = 'board-columns';
 
         // Today column
-        const todayTasks = this.ds.getTodayTasks();
-        const todayCol = this._renderColumn('오늘 할 일', todayTasks, null, true);
+        var todayTasks = this.ds.getTodayTasks();
+        var todayCol = this._renderColumn('오늘 할 일', todayTasks, null, true);
         todayCol.classList.add('today-column');
         columnsRow.appendChild(todayCol);
 
         // Status columns
-        TaskStatusList.forEach(status => {
-            const tasks = this.ds.getTasksForStatus(status);
-            const col = this._renderColumn(status, tasks, status, false);
+        var self = this;
+        TaskStatusList.forEach(function(status) {
+            var tasks = self.ds.getTasksForStatus(status);
+            var col = self._renderColumn(status, tasks, status, false);
             columnsRow.appendChild(col);
         });
 
         wrapper.appendChild(columnsRow);
 
         // Bulk action bar
-        const bulkBar = this._renderBulkBar();
+        var bulkBar = this._renderBulkBar();
         if (bulkBar) wrapper.appendChild(bulkBar);
 
         container.appendChild(wrapper);
@@ -84,43 +106,41 @@ class BoardView {
     }
 
     _renderHeader() {
-        const header = document.createElement('div');
+        var header = document.createElement('div');
         header.className = 'board-header';
 
-        const stats = document.createElement('div');
+        var stats = document.createElement('div');
         stats.className = 'header-stats';
 
-        const activeTasks = this.ds.getActiveTasks();
-        const todayTasks = this.ds.getTodayTasks();
-        const focusTasks = this.ds.getFocusTasks();
+        var activeTasks = this.ds.getActiveTasks();
+        var todayTasks = this.ds.getTodayTasks();
+        var focusTasks = this.ds.getFocusTasks();
 
-        stats.innerHTML = `
-            <div class="stat-item">
-                <span class="stat-label">Active</span>
-                <span class="stat-value">${activeTasks.length}</span>
-            </div>
-            <span class="stat-separator">|</span>
-            <div class="stat-item">
-                <span class="stat-label">Today</span>
-                <span class="stat-value">${todayTasks.length}</span>
-            </div>
-            <span class="stat-separator">|</span>
-            <div class="stat-item">
-                <span class="stat-label">Focus</span>
-                <span class="stat-value">${focusTasks.length}</span>
-            </div>
-        `;
+        stats.innerHTML =
+            '<div class="stat-item">' +
+                '<span class="stat-label">Active</span>' +
+                '<span class="stat-value">' + activeTasks.length + '</span>' +
+            '</div>' +
+            '<span class="stat-separator">|</span>' +
+            '<div class="stat-item">' +
+                '<span class="stat-label">Today</span>' +
+                '<span class="stat-value">' + todayTasks.length + '</span>' +
+            '</div>' +
+            '<span class="stat-separator">|</span>' +
+            '<div class="stat-item">' +
+                '<span class="stat-label">Focus</span>' +
+                '<span class="stat-value">' + focusTasks.length + '</span>' +
+            '</div>';
 
-        const actions = document.createElement('div');
+        var actions = document.createElement('div');
         actions.className = 'header-actions';
-        actions.innerHTML = `
-            <button class="btn-modern" id="btn-export" title="Export">📥 Export</button>
-            <button class="btn-modern" id="btn-import" title="Import">📤 Import</button>
-            <input type="file" id="import-file" accept=".json" style="display:none">
-            <button class="btn-modern" id="btn-undo" title="Undo (Ctrl+Z)" disabled>↩️ Undo</button>
-            <button class="btn-modern" id="btn-hide-completed">${this.hideCompleted ? '👁️ Show Completed' : '🙈 Hide Completed'}</button>
-            <button class="btn-modern" id="btn-show-hidden" style="display:${this.showHidden ? 'inline-flex' : 'none'}">${this.showHidden ? '👻 Hide Hidden' : '👻 Show Hidden'}</button>
-        `;
+        actions.innerHTML =
+            '<button class="btn-modern" id="btn-export" title="Export">📥 Export</button>' +
+            '<button class="btn-modern" id="btn-import" title="Import">📤 Import</button>' +
+            '<input type="file" id="import-file" accept=".json" style="display:none">' +
+            '<button class="btn-modern" id="btn-undo" title="Undo (Ctrl+Z)" disabled>↩️ Undo</button>' +
+            '<button class="btn-modern" id="btn-hide-completed">' + (this.hideCompleted ? '👁️ Show Completed' : '🙈 Hide Completed') + '</button>' +
+            '<button class="btn-modern" id="btn-show-hidden" style="display:' + (this.showHidden ? 'inline-flex' : 'none') + '">' + (this.showHidden ? '👻 Hide Hidden' : '👻 Show Hidden') + '</button>';
 
         header.appendChild(stats);
         header.appendChild(actions);
@@ -131,33 +151,33 @@ class BoardView {
     }
 
     _wireHeaderEvents(actions) {
-        const self = this;
-        const exportBtn = actions.querySelector('#btn-export');
-        const importBtn = actions.querySelector('#btn-import');
-        const importFile = actions.querySelector('#import-file');
-        const undoBtn = actions.querySelector('#btn-undo');
-        const hideCompletedBtn = actions.querySelector('#btn-hide-completed');
-        const showHiddenBtn = actions.querySelector('#btn-show-hidden');
+        var self = this;
+        var exportBtn = actions.querySelector('#btn-export');
+        var importBtn = actions.querySelector('#btn-import');
+        var importFile = actions.querySelector('#import-file');
+        var undoBtn = actions.querySelector('#btn-undo');
+        var hideCompletedBtn = actions.querySelector('#btn-hide-completed');
+        var showHiddenBtn = actions.querySelector('#btn-show-hidden');
 
-        if (exportBtn) exportBtn.addEventListener('click', () => self._exportData());
-        if (importBtn) importBtn.addEventListener('click', () => importFile.click());
-        if (importFile) importFile.addEventListener('change', (e) => self._importData(e));
+        if (exportBtn) exportBtn.addEventListener('click', function() { self._exportData(); });
+        if (importBtn) importBtn.addEventListener('click', function() { importFile.click(); });
+        if (importFile) importFile.addEventListener('change', function(e) { self._importData(e); });
         if (undoBtn) {
-            if (self.undo.canUndo) undoBtn.disabled = false;
-            undoBtn.addEventListener('click', async () => {
-                await self.undo.undoLatest();
+            if (self.undo.canUndo()) undoBtn.disabled = false;
+            undoBtn.addEventListener('click', function() {
+                self.undo.undoLatest();
                 self.render();
             });
         }
         if (hideCompletedBtn) {
-            hideCompletedBtn.addEventListener('click', () => {
+            hideCompletedBtn.addEventListener('click', function() {
                 self.hideCompleted = !self.hideCompleted;
                 localStorage.setItem('gtd-hide-completed', self.hideCompleted);
                 self.render();
             });
         }
         if (showHiddenBtn) {
-            showHiddenBtn.addEventListener('click', () => {
+            showHiddenBtn.addEventListener('click', function() {
                 self.showHidden = !self.showHidden;
                 localStorage.setItem('gtd-show-hidden', self.showHidden);
                 self.render();
@@ -166,31 +186,32 @@ class BoardView {
     }
 
     _renderColumn(title, tasks, status, isTodayColumn) {
-        const col = document.createElement('div');
+        var self = this;
+        var col = document.createElement('div');
         col.className = 'board-column';
         if (status) col.dataset.status = status;
 
-        const colHeader = document.createElement('div');
+        var colHeader = document.createElement('div');
         colHeader.className = 'column-header';
 
-        const filteredTasks = this._filterTasks(tasks);
+        var filteredTasks = this._filterTasks(tasks);
 
-        const titleEl = document.createElement('h3');
+        var titleEl = document.createElement('h3');
         titleEl.textContent = title + ' (' + filteredTasks.length + ')';
         colHeader.appendChild(titleEl);
 
         if (status === TaskStatus.Completed) {
-            const clearBtn = document.createElement('button');
+            var clearBtn = document.createElement('button');
             clearBtn.className = 'btn-clear-completed';
             clearBtn.textContent = '🗑️ Clear All';
-            clearBtn.addEventListener('click', () => {
+            clearBtn.addEventListener('click', function() {
                 if (confirm('완료된 모든 작업을 삭제하시겠습니까?')) {
-                    const completedTasks = this.ds.getTasksForStatus(TaskStatus.Completed);
-                    const snapshot = completedTasks.map(t => t.clone());
-                    this.ds.deleteAllCompleted();
-                    this.undo.push({
-                        desc: `Deleted ${snapshot.length} completed tasks`,
-                        undo: () => this.ds.restoreTasks(snapshot)
+                    var completedTasks = self.ds.getTasksForStatus(TaskStatus.Completed);
+                    var snapshot = completedTasks.map(function(t) { return t.clone(); });
+                    self.ds.deleteAllCompleted();
+                    self.undo.push({
+                        desc: 'Deleted ' + snapshot.length + ' completed tasks',
+                        undo: function() { self.ds.restoreTasks(snapshot); }
                     });
                 }
             });
@@ -199,34 +220,74 @@ class BoardView {
 
         col.appendChild(colHeader);
 
-        const taskList = document.createElement('div');
+        var taskList = document.createElement('div');
         taskList.className = 'task-list';
 
-        if (!isTodayColumn) {
-            taskList.addEventListener('dragover', (e) => {
+        // ★★★ 칼럼 상단 드롭존 (데스크탑 drag용) ★★★
+        if (!isTodayColumn && status) {
+            var topDropZone = document.createElement('div');
+            topDropZone.className = 'column-drop-top';
+
+            topDropZone.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                topDropZone.classList.add('drag-over-top');
+            });
+            topDropZone.addEventListener('dragleave', function() {
+                topDropZone.classList.remove('drag-over-top');
+            });
+            topDropZone.addEventListener('drop', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                topDropZone.classList.remove('drag-over-top');
+                var ids = self.dragDrop.getIdsToMove();
+                if (ids.length > 0) {
+                    self.ds.moveTasks(ids, status, null, 0);
+                }
+                self.dragDrop.endDrag();
+            });
+            taskList.appendChild(topDropZone);
+        }
+
+        // 칼럼 빈 영역 드롭 (데스크탑 drag용)
+        if (!isTodayColumn && status) {
+            taskList.addEventListener('dragover', function(e) {
                 e.preventDefault();
                 taskList.classList.add('drag-over-column');
             });
-            taskList.addEventListener('dragleave', () => {
-                taskList.classList.remove('drag-over-column');
+            taskList.addEventListener('dragleave', function(e) {
+                // taskList 자체를 벗어났을 때만 제거
+                if (!taskList.contains(e.relatedTarget)) {
+                    taskList.classList.remove('drag-over-column');
+                }
             });
-            taskList.addEventListener('drop', (e) => {
+            taskList.addEventListener('drop', function(e) {
                 e.preventDefault();
                 taskList.classList.remove('drag-over-column');
-                const draggedIds = this.dragDrop.getMovingIds();
-                if (draggedIds.length > 0 && status) {
-                    this.ds.moveTasks(draggedIds, status, null, 'Inside');
+                // 이미 topDropZone이나 task 위에서 처리되었으면 무시
+                var target = e.target;
+                if (target.closest('.column-drop-top') || target.closest('.task-node-self')) {
+                    return;
                 }
-                this.dragDrop.endDrag();
+                var ids = self.dragDrop.getIdsToMove();
+                if (ids.length > 0) {
+                    // 칼럼 빈 영역 = 맨 아래에 추가
+                    var siblings = self.ds.getRawTasks().filter(function(t) {
+                        return t.ParentId == null && t.Status === status;
+                    });
+                    self.ds.moveTasks(ids, status, null, siblings.length);
+                }
+                self.dragDrop.endDrag();
             });
         }
 
-        const trees = this.ds.buildTree(filteredTasks);
-        trees.forEach(task => {
-            const node = this.nodeRenderer.render(task, {
-                selectedIds: this.selectedIds,
-                hideCompleted: this.hideCompleted,
-                showHidden: this.showHidden
+        var trees = this.ds.buildTree(filteredTasks);
+        trees.forEach(function(task) {
+            var node = self.nodeRenderer.render(task, {
+                selectedIds: self.selectedIds,
+                hideCompleted: self.hideCompleted,
+                showHidden: self.showHidden,
+                isMultiSelectMode: self.isMultiSelectMode
             });
             if (node) taskList.appendChild(node);
         });
@@ -234,10 +295,10 @@ class BoardView {
         col.appendChild(taskList);
 
         if (status && status !== TaskStatus.Completed && !isTodayColumn) {
-            const addBtn = document.createElement('button');
+            var addBtn = document.createElement('button');
             addBtn.className = 'add-task-btn';
             addBtn.textContent = '+ Add Task';
-            addBtn.addEventListener('click', () => this._showQuickAdd(col, status, addBtn));
+            addBtn.addEventListener('click', function() { self._showQuickAdd(col, status, addBtn); });
             col.appendChild(addBtn);
         }
 
@@ -245,9 +306,10 @@ class BoardView {
     }
 
     _filterTasks(tasks) {
-        return tasks.filter(t => {
-            if (this.hideCompleted && t.IsCompleted) return false;
-            if (!this.showHidden && t.IsHidden) return false;
+        var self = this;
+        return tasks.filter(function(t) {
+            if (self.hideCompleted && t.IsCompleted) return false;
+            if (!self.showHidden && t.IsHidden) return false;
             return true;
         });
     }
@@ -269,7 +331,7 @@ class BoardView {
 
         var done = false;
 
-        input.addEventListener('keydown', function (e) {
+        input.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 if (input.value.trim() && !done) {
@@ -285,8 +347,8 @@ class BoardView {
             }
         });
 
-        input.addEventListener('blur', function () {
-            setTimeout(function () {
+        input.addEventListener('blur', function() {
+            setTimeout(function() {
                 if (!done && input.value.trim()) {
                     self.ds.addTask(input.value.trim(), status, null);
                 }
@@ -299,14 +361,14 @@ class BoardView {
     _showChildQuickAdd(parent) {
         var self = this;
         var parentId = parent.Id;
-        var parentEl = document.querySelector('[data-task-id="' + parentId + '"]');
-        if (!parentEl) return;
+        var nodeEl = document.querySelector('.task-node[data-task-id="' + parentId + '"]');
+        if (!nodeEl) return;
 
-        var childrenContainer = parentEl.querySelector('.task-node-children');
+        var childrenContainer = nodeEl.querySelector('.task-node-children');
         if (!childrenContainer) {
             childrenContainer = document.createElement('div');
             childrenContainer.className = 'task-node-children';
-            parentEl.appendChild(childrenContainer);
+            nodeEl.appendChild(childrenContainer);
         }
 
         var container = document.createElement('div');
@@ -326,7 +388,7 @@ class BoardView {
 
         var done = false;
 
-        input.addEventListener('keydown', function (e) {
+        input.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 if (input.value.trim() && !done) {
@@ -342,8 +404,8 @@ class BoardView {
             }
         });
 
-        input.addEventListener('blur', function () {
-            setTimeout(function () {
+        input.addEventListener('blur', function() {
+            setTimeout(function() {
                 if (!done && input.value.trim()) {
                     self.ds.addTask(input.value.trim(), parent.Status, parentId);
                 }
@@ -361,13 +423,13 @@ class BoardView {
             }
             this.isMultiSelectMode = this.selectedIds.size > 0;
         } else if (e.shiftKey && this.lastClickedId !== null) {
-            const list = this.renderedTasks;
-            const startIdx = list.findIndex(t => t.Id === this.lastClickedId);
-            const endIdx = list.findIndex(t => t.Id === task.Id);
+            var list = this.renderedTasks;
+            var startIdx = list.findIndex(function(t) { return t.Id === this.lastClickedId; }.bind(this));
+            var endIdx = list.findIndex(function(t) { return t.Id === task.Id; });
             if (startIdx !== -1 && endIdx !== -1) {
-                const from = Math.min(startIdx, endIdx);
-                const to = Math.max(startIdx, endIdx);
-                for (let i = from; i <= to; i++) {
+                var from = Math.min(startIdx, endIdx);
+                var to = Math.max(startIdx, endIdx);
+                for (var i = from; i <= to; i++) {
                     this.selectedIds.add(list[i].Id);
                 }
             }
@@ -387,30 +449,35 @@ class BoardView {
     }
 
     _openModal(task) {
-        this.modal.open(task.Id, () => {
-            this.render();
+        var self = this;
+        this.modal.open(task.Id, function() {
+            self.render();
         });
     }
 
     _deleteTask(task) {
-        const snapshot = task.clone();
-        const children = this.ds.getAllTasks().filter(t => t.ParentId === task.Id).map(t => t.clone());
+        var self = this;
+        var snapshot = task.clone();
+        var children = this.ds.getRawTasks().filter(function(t) { return t.ParentId === task.Id; }).map(function(t) { return t.clone(); });
         this.ds.deleteTask(task.Id);
         this.undo.push({
-            desc: `Deleted "${task.Title}"`,
-            undo: () => {
-                this.ds.restoreTasks([snapshot, ...children]);
+            desc: 'Deleted "' + task.Title + '"',
+            undo: function() {
+                self.ds.restoreTasks([snapshot].concat(children));
             }
         });
     }
 
+    // ★ _handleDrop: position 문자열을 dataService._resolveDropLocation이 처리 ★
     _handleDrop(targetId, position) {
-        const movingIds = this.dragDrop.getMovingIds();
+        var movingIds = this.dragDrop.getIdsToMove();
         if (movingIds.length === 0) return;
 
-        const targetTask = this.ds.getById(targetId);
+        var targetTask = this.ds.getById(targetId);
         if (!targetTask) return;
 
+        // dataService.moveTasks가 _resolveDropLocation을 통해
+        // targetId를 기준으로 Above/Below/Inside를 올바르게 해석
         this.ds.moveTasks(movingIds, targetTask.Status, targetId, position);
         this.dragDrop.endDrag();
     }
@@ -418,69 +485,68 @@ class BoardView {
     _renderBulkBar() {
         if (this.selectedIds.size < 2) return null;
 
-        const bar = document.createElement('div');
+        var self = this;
+        var bar = document.createElement('div');
         bar.className = 'bulk-action-bar';
-        bar.innerHTML = `
-            <span>${this.selectedIds.size} tasks selected</span>
-            <button class="btn-modern" id="bulk-edit-btn">✏️ Bulk Edit</button>
-            <button class="btn-modern" id="bulk-delete-btn">🗑️ Delete</button>
-            <button class="btn-modern" id="bulk-cancel-btn">✖ Cancel</button>
-        `;
+        bar.innerHTML =
+            '<span>' + this.selectedIds.size + ' tasks selected</span>' +
+            '<button class="btn-modern" id="bulk-edit-btn">✏️ Bulk Edit</button>' +
+            '<button class="btn-modern" id="bulk-delete-btn">🗑️ Delete</button>' +
+            '<button class="btn-modern" id="bulk-cancel-btn">✖ Cancel</button>';
 
-        const self = this;
-
-        bar.querySelector('#bulk-edit-btn').addEventListener('click', () => {
-            this.bulkPanel.show(
-                this.selectedIds,
-                (model) => {
-                    const snapshots = [];
-                    model.taskIds.forEach(id => {
-                        const t = self.ds.getById(id);
+        bar.querySelector('#bulk-edit-btn').addEventListener('click', function() {
+            self.bulkPanel.show(
+                self.selectedIds,
+                function(model) {
+                    var snapshots = [];
+                    model.taskIds.forEach(function(id) {
+                        var t = self.ds.getById(id);
                         if (t) snapshots.push(t.clone());
                     });
                     self.ds.bulkUpdate(model);
                     self.undo.push({
-                        desc: `Bulk edited ${model.taskIds.length} tasks`,
-                        undo: () => self.ds.restoreTasks(snapshots)
+                        desc: 'Bulk edited ' + model.taskIds.length + ' tasks',
+                        undo: function() { self.ds.restoreTasks(snapshots); }
                     });
                     self.selectedIds.clear();
                     self.render();
                 },
-                () => { }
+                function() { }
             );
         });
 
-        bar.querySelector('#bulk-delete-btn').addEventListener('click', () => {
-            if (confirm(this.selectedIds.size + '개 작업을 삭제하시겠습니까?')) {
-                const ids = Array.from(this.selectedIds);
-                const snapshots = ids.map(id => this.ds.getById(id)).filter(Boolean).map(t => t.clone());
-                this.ds.deleteTasks(ids);
-                this.undo.push({
-                    desc: `Deleted ${ids.length} tasks`,
-                    undo: () => this.ds.restoreTasks(snapshots)
+        bar.querySelector('#bulk-delete-btn').addEventListener('click', function() {
+            if (confirm(self.selectedIds.size + '개 작업을 삭제하시겠습니까?')) {
+                var ids = Array.from(self.selectedIds);
+                var snapshots = ids.map(function(id) { return self.ds.getById(id); }).filter(Boolean).map(function(t) { return t.clone(); });
+                self.ds.deleteTasks(ids);
+                self.undo.push({
+                    desc: 'Deleted ' + ids.length + ' tasks',
+                    undo: function() { self.ds.restoreTasks(snapshots); }
                 });
-                this.selectedIds.clear();
-                this.render();
+                self.selectedIds.clear();
+                self.render();
             }
         });
 
-        bar.querySelector('#bulk-cancel-btn').addEventListener('click', () => {
-            this.selectedIds.clear();
-            this.isMultiSelectMode = false;
-            this.render();
+        bar.querySelector('#bulk-cancel-btn').addEventListener('click', function() {
+            self.selectedIds.clear();
+            self.isMultiSelectMode = false;
+            self.render();
         });
 
         return bar;
     }
 
     _buildRenderedList() {
-        const all = [];
-        TaskStatusList.forEach(status => {
-            const tasks = this.ds.getTasksForStatus(status);
-            const filtered = this._filterTasks(tasks);
-            const trees = this.ds.buildTree(filtered);
-            const flatten = (list) => {
-                list.forEach(t => {
+        var all = [];
+        var self = this;
+        TaskStatusList.forEach(function(status) {
+            var tasks = self.ds.getTasksForStatus(status);
+            var filtered = self._filterTasks(tasks);
+            var trees = self.ds.buildTree(filtered);
+            var flatten = function(list) {
+                list.forEach(function(t) {
                     all.push(t);
                     if (t.Children && t.Children.length > 0 && t.IsExpanded) {
                         flatten(t.Children);
@@ -502,10 +568,10 @@ class BoardView {
 
     _exportData() {
         try {
-            const json = this.ds.exportToJson();
-            const blob = new Blob([json], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
+            var json = this.ds.exportToJson();
+            var blob = new Blob([json], { type: 'application/json' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
             a.href = url;
             a.download = 'gtd-backup-' + new Date().toISOString().slice(0, 10) + '.json';
             a.click();
@@ -517,20 +583,19 @@ class BoardView {
     }
 
     _importData(e) {
-        const file = e.target.files[0];
+        var self = this;
+        var file = e.target.files[0];
         if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (evt) => {
+        var reader = new FileReader();
+        reader.onload = function(evt) {
             try {
-                const result = this.ds.importFromJson(evt.target.result);
-                if (result.success) {
-                    this.toast.success('Imported ' + result.count + ' tasks');
-                    this.render();
-                } else {
-                    this.toast.error('Import failed: ' + result.error);
+                var result = self.ds.importFromJson(evt.target.result);
+                if (result && result.success) {
+                    self.toast.success('Imported ' + result.count + ' tasks');
+                    self.render();
                 }
             } catch (err) {
-                this.toast.error('Import failed: ' + err.message);
+                self.toast.error('Import failed: ' + err.message);
             }
         };
         reader.readAsText(file);
