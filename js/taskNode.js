@@ -3,17 +3,16 @@ class TaskNodeRenderer {
         this.ds = dataService;
         this.cb = callbacks;
 
-        // 홀드 타이머 (자식 모드 전환용)
         this._holdTimer = null;
         this._holdTargetEl = null;
 
-        // 모바일 감지
         this._isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
-        // ── 모바일 터치 드래그 상태 ──
         this._touchState = {
             startX: 0,
             startY: 0,
+            offsetX: 0,
+            offsetY: 0,
             taskId: null,
             sourceEl: null,
             ghostEl: null,
@@ -47,7 +46,6 @@ class TaskNodeRenderer {
         selfEl.className = 'task-node-self';
         selfEl.dataset.taskId = task.Id;
 
-        // ★ 모바일에서는 draggable 비활성화 (브라우저 기본 드래그 방지)
         if (!this._isTouchDevice) {
             selfEl.draggable = true;
         }
@@ -148,7 +146,7 @@ class TaskNodeRenderer {
         });
 
         // ══════════════════════════════════
-        // 데스크탑 Drag API (터치 기기가 아닐 때만)
+        // 데스크탑 Drag API
         // ══════════════════════════════════
         if (!this._isTouchDevice) {
             selfEl.addEventListener('dragstart', function(e) {
@@ -178,30 +176,36 @@ class TaskNodeRenderer {
         }
 
         // ══════════════════════════════════
-        // 모바일 Touch 드래그 (터치 기기일 때만)
+        // 모바일 Touch 드래그
         // ══════════════════════════════════
         if (this._isTouchDevice) {
             selfEl.addEventListener('touchstart', function(e) {
                 if (e.touches.length !== 1) return;
                 var touch = e.touches[0];
+
+                // 손가락과 요소 간 오프셋 계산 (고스트가 정확히 손가락 아래에 오도록)
+                var rect = selfEl.getBoundingClientRect();
+                self._touchState.offsetX = touch.clientX - rect.left;
+                self._touchState.offsetY = touch.clientY - rect.top;
                 self._touchState.startX = touch.clientX;
                 self._touchState.startY = touch.clientY;
                 self._touchState.taskId = task.Id;
                 self._touchState.sourceEl = selfEl;
                 self._touchState.isDragging = false;
 
-                // 0.5초 롱프레스로 드래그 시작
                 self._touchState.longPressTimer = setTimeout(function() {
                     self._touchState.isDragging = true;
                     selfEl.classList.add('is-dragging-source');
                     self.cb.onDragStart(task.Id, selfEl);
                     self._createGhost(selfEl, touch.clientX, touch.clientY);
-
                     if (navigator.vibrate) navigator.vibrate(30);
                 }, 500);
 
                 document.addEventListener('touchmove', self._boundTouchMove, { passive: false });
                 document.addEventListener('touchend', self._boundTouchEnd);
+
+                // ★ 컨텍스트 메뉴 방지
+                selfEl.addEventListener('contextmenu', self._preventContext);
             }, { passive: true });
         }
 
@@ -231,27 +235,29 @@ class TaskNodeRenderer {
     // 모바일 Touch 핸들러
     // ══════════════════════════════════
 
+    _preventContext(e) {
+        e.preventDefault();
+    }
+
     _createGhost(sourceEl, x, y) {
+        var ts = this._touchState;
         var ghost = sourceEl.cloneNode(true);
         ghost.className = 'task-node-self touch-drag-ghost';
         ghost.style.position = 'fixed';
         ghost.style.zIndex = '9999';
         ghost.style.pointerEvents = 'none';
-        ghost.style.opacity = '0.85';
         ghost.style.width = sourceEl.offsetWidth + 'px';
-        ghost.style.transform = 'rotate(2deg) scale(1.03)';
-        ghost.style.boxShadow = '0 8px 24px rgba(0,0,0,0.2)';
-        ghost.style.left = (x - sourceEl.offsetWidth / 2) + 'px';
-        ghost.style.top = (y - 20) + 'px';
+        // ★ 손가락 위치 기준으로 정확하게 배치 (기울기 없음)
+        ghost.style.left = (x - ts.offsetX) + 'px';
+        ghost.style.top = (y - ts.offsetY) + 'px';
         document.body.appendChild(ghost);
-        this._touchState.ghostEl = ghost;
+        ts.ghostEl = ghost;
     }
 
     _onTouchMove(e) {
         var ts = this._touchState;
         var touch = e.touches[0];
 
-        // 롱프레스 전에 움직이면 취소
         if (!ts.isDragging) {
             var dx = Math.abs(touch.clientX - ts.startX);
             var dy = Math.abs(touch.clientY - ts.startY);
@@ -261,15 +267,14 @@ class TaskNodeRenderer {
             return;
         }
 
-        // 드래그 중 — 스크롤 방지, 고스트 이동
         e.preventDefault();
 
         if (ts.ghostEl) {
-            ts.ghostEl.style.left = (touch.clientX - ts.sourceEl.offsetWidth / 2) + 'px';
-            ts.ghostEl.style.top = (touch.clientY - 20) + 'px';
+            // ★ 손가락 오프셋 유지 — 고스트가 정확히 원래 위치에서 따라다님
+            ts.ghostEl.style.left = (touch.clientX - ts.offsetX) + 'px';
+            ts.ghostEl.style.top = (touch.clientY - ts.offsetY) + 'px';
         }
 
-        // 손가락 아래의 드롭 타겟 찾기
         if (ts.ghostEl) ts.ghostEl.style.display = 'none';
         var elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
         if (ts.ghostEl) ts.ghostEl.style.display = '';
@@ -280,7 +285,6 @@ class TaskNodeRenderer {
     _updateTouchDropTarget(elemBelow, clientY) {
         var ts = this._touchState;
 
-        // 이전 타겟 정리
         if (ts.currentDropTarget && ts.currentDropTarget !== elemBelow) {
             var prevSelf = ts.currentDropTarget.closest('.task-node-self');
             if (prevSelf) {
@@ -289,7 +293,6 @@ class TaskNodeRenderer {
             var prevTop = ts.currentDropTarget.closest('.column-drop-top');
             if (prevTop) prevTop.classList.remove('drag-over-top');
 
-            // task-list 하이라이트도 정리
             document.querySelectorAll('.drag-over-column').forEach(function(el) {
                 el.classList.remove('drag-over-column');
             });
@@ -305,7 +308,6 @@ class TaskNodeRenderer {
 
         ts.currentDropTarget = elemBelow;
 
-        // ── column-drop-top 위인지 체크 ──
         var dropTopEl = elemBelow.closest('.column-drop-top');
         if (dropTopEl) {
             dropTopEl.classList.add('drag-over-top');
@@ -314,10 +316,7 @@ class TaskNodeRenderer {
             return;
         }
 
-        // ── task-node-self 위인지 체크 (task-list보다 먼저) ──
         var taskSelfEl = elemBelow.closest('.task-node-self');
-
-        // ── task-list 빈 영역인지 체크 ──
         var taskListEl = elemBelow.closest('.task-list');
 
         if (taskListEl && !taskSelfEl) {
@@ -327,12 +326,10 @@ class TaskNodeRenderer {
             return;
         }
 
-        // task-list 하이라이트 제거
         document.querySelectorAll('.drag-over-column').forEach(function(el) {
             el.classList.remove('drag-over-column');
         });
 
-        // ── task-node-self 위인지 체크 ──
         if (!taskSelfEl) {
             ts.currentDropPosition = null;
             this._clearHoldTimer();
@@ -356,7 +353,6 @@ class TaskNodeRenderer {
             return;
         }
 
-        // 이미 자식 모드면 유지
         if (taskSelfEl.classList.contains('drop-inside')) {
             return;
         }
@@ -375,7 +371,6 @@ class TaskNodeRenderer {
             ts.currentDropPosition = 'Below';
         }
 
-        // 홀드 타이머: 같은 타겟에 0.8초 머무르면 자식 모드
         var self = this;
         if (this._holdTargetEl !== taskSelfEl) {
             this._clearHoldTimer();
@@ -396,18 +391,21 @@ class TaskNodeRenderer {
         document.removeEventListener('touchmove', this._boundTouchMove);
         document.removeEventListener('touchend', this._boundTouchEnd);
 
+        // ★ 컨텍스트 메뉴 방지 리스너 제거
+        if (ts.sourceEl) {
+            ts.sourceEl.removeEventListener('contextmenu', this._preventContext);
+        }
+
         if (!ts.isDragging) {
             this._cancelTouch();
             return;
         }
 
-        // 고스트 제거
         if (ts.ghostEl) {
             ts.ghostEl.remove();
             ts.ghostEl = null;
         }
 
-        // 소스 스타일 복원
         if (ts.sourceEl) {
             ts.sourceEl.classList.remove('is-dragging-source');
         }
@@ -416,7 +414,6 @@ class TaskNodeRenderer {
 
         var position = ts.currentDropPosition;
 
-        // ── column-drop-top에 드롭 ──
         if (position === 'column-top') {
             var topEl = ts.currentDropTarget ? ts.currentDropTarget.closest('.column-drop-top') : null;
             if (topEl) topEl.classList.remove('drag-over-top');
@@ -432,7 +429,6 @@ class TaskNodeRenderer {
             return;
         }
 
-        // ── 칼럼 빈 영역에 드롭 ──
         if (position === 'column-empty') {
             document.querySelectorAll('.drag-over-column').forEach(function(el) {
                 el.classList.remove('drag-over-column');
@@ -451,7 +447,6 @@ class TaskNodeRenderer {
             return;
         }
 
-        // ── task 위에 드롭 ──
         if (position === 'Above' || position === 'Below' || position === 'Inside') {
             var targetSelfEl = ts.currentDropTarget ? ts.currentDropTarget.closest('.task-node-self') : null;
             if (targetSelfEl) {
@@ -466,7 +461,6 @@ class TaskNodeRenderer {
             return;
         }
 
-        // 아무 곳에도 안 떨어짐 — 취소
         this.cb.onDragEnd();
         this._resetTouchState();
     }
@@ -485,6 +479,9 @@ class TaskNodeRenderer {
             clearTimeout(ts.longPressTimer);
             ts.longPressTimer = null;
         }
+        if (ts.sourceEl) {
+            ts.sourceEl.removeEventListener('contextmenu', this._preventContext);
+        }
         document.removeEventListener('touchmove', this._boundTouchMove);
         document.removeEventListener('touchend', this._boundTouchEnd);
         this._resetTouchState();
@@ -498,6 +495,8 @@ class TaskNodeRenderer {
         this._touchState = {
             startX: 0,
             startY: 0,
+            offsetX: 0,
+            offsetY: 0,
             taskId: null,
             sourceEl: null,
             ghostEl: null,
