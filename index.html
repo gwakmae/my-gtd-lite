@@ -1,21 +1,20 @@
 <!DOCTYPE html>
 <html lang="ko">
-
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>GTD Board</title>
-    <link rel="stylesheet" href="css/variables.css?v=3" />
-    <link rel="stylesheet" href="css/base.css?v=3" />
-    <link rel="stylesheet" href="css/layout.css?v=3" />
-    <link rel="stylesheet" href="css/header.css?v=3" />
-    <link rel="stylesheet" href="css/sidebar.css?v=3" />
-    <link rel="stylesheet" href="css/components.css?v=3" />
-    <link rel="stylesheet" href="css/board.css?v=3" />
-    <link rel="stylesheet" href="css/modal.css?v=3" />
-    <link rel="stylesheet" href="css/dragdrop.css?v=3" />
-    <link rel="stylesheet" href="css/responsive.css?v=3" />
-    <link rel="stylesheet" href="css/animations.css?v=3" />
+    <link rel="stylesheet" href="css/variables.css?v=4" />
+    <link rel="stylesheet" href="css/base.css?v=4" />
+    <link rel="stylesheet" href="css/layout.css?v=4" />
+    <link rel="stylesheet" href="css/header.css?v=4" />
+    <link rel="stylesheet" href="css/sidebar.css?v=4" />
+    <link rel="stylesheet" href="css/components.css?v=4" />
+    <link rel="stylesheet" href="css/board.css?v=4" />
+    <link rel="stylesheet" href="css/modal.css?v=4" />
+    <link rel="stylesheet" href="css/dragdrop.css?v=4" />
+    <link rel="stylesheet" href="css/responsive.css?v=4" />
+    <link rel="stylesheet" href="css/animations.css?v=4" />
     <style>
         .login-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10000}
         .login-box{background:#fff;border-radius:16px;padding:40px;text-align:center;max-width:360px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
@@ -28,9 +27,7 @@
         .sync-status{font-size:11px;color:#999;padding:4px 12px;display:none}
     </style>
 </head>
-
 <body>
-    <!-- 로그인 오버레이 -->
     <div id="login-overlay" class="login-overlay" style="display:none;">
         <div class="login-box">
             <h2>GTD Board</h2>
@@ -44,9 +41,7 @@
     <div id="offline-badge" class="offline-badge">오프라인 모드</div>
     <div id="sync-status" class="sync-status"></div>
 
-    <!-- 전체 레이아웃 -->
     <div class="page">
-        <!-- 사이드바 -->
         <aside class="sidebar" id="sidebar">
             <div class="mobile-header">
                 <button class="sidebar-toggle-btn" id="sidebar-close">✕</button>
@@ -56,7 +51,6 @@
         </aside>
         <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
-        <!-- 메인 영역 -->
         <main>
             <div class="mobile-header" id="mobile-header">
                 <button class="sidebar-toggle-btn" id="sidebar-toggle">☰</button>
@@ -66,31 +60,26 @@
         </main>
     </div>
 
-    <!-- Undo 스낵바 -->
     <div class="undo-snackbar" id="undo-snackbar" style="display:none;">
         <span id="undo-message"></span>
         <button class="undo-btn" id="undo-btn">실행취소</button>
         <button class="close-btn" id="undo-close-btn">×</button>
     </div>
-
-    <!-- 토스트 -->
     <div id="toast-container" class="toast-container"></div>
 
-    <!-- JS (캐시 방지) -->
-    <script src="js/enums.js?v=3"></script>
-    <script src="js/models.js?v=3"></script>
-    <script src="js/dataService.js?v=3"></script>
-    <script src="js/undoService.js?v=3"></script>
-    <script src="js/toast.js?v=3"></script>
-    <script src="js/taskNode.js?v=3"></script>
-    <script src="js/taskModal.js?v=3"></script>
-    <script src="js/dragDrop.js?v=3"></script>
-    <script src="js/boardView.js?v=3"></script>
-    <script src="js/listView.js?v=3"></script>
-    <script src="js/bulkEdit.js?v=3"></script>
-    <script src="js/app.js?v=3"></script>
+    <script src="js/enums.js?v=4"></script>
+    <script src="js/models.js?v=4"></script>
+    <script src="js/dataService.js?v=4"></script>
+    <script src="js/undoService.js?v=4"></script>
+    <script src="js/toast.js?v=4"></script>
+    <script src="js/taskNode.js?v=4"></script>
+    <script src="js/taskModal.js?v=4"></script>
+    <script src="js/dragDrop.js?v=4"></script>
+    <script src="js/boardView.js?v=4"></script>
+    <script src="js/listView.js?v=4"></script>
+    <script src="js/bulkEdit.js?v=4"></script>
+    <script src="js/app.js?v=4"></script>
 
-    <!-- Firebase -->
     <script>
         (function(){
             var scripts=['https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js','https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js','https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js'];
