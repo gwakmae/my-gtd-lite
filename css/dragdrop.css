@@ -1,7 +1,7 @@
 /* 드래그 소스 */
 .task-node-self.is-dragging-source {
-    opacity: 0.3;
-    transform: scale(0.97);
+    opacity: 0.4;
+    transform: scale(0.98);
 }
 
 /* ── 형제(위) - 파란 선 ── */
@@ -42,7 +42,7 @@
     z-index: 10;
 }
 
-/* ── 자식 모드 (홀드 0.8초 후) ── */
+/* ── 자식 모드 (홀드 0.8초 후) - 점선 + 라벨 ── */
 .task-node-self.drop-inside {
     position: relative;
     background-color: rgba(59, 130, 246, 0.08) !important;
@@ -84,16 +84,16 @@
 
 /* ── 칼럼 상단 드롭존 ── */
 .column-drop-top {
-    min-height: 12px;
+    min-height: 6px;
     border-radius: 4px;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
     transition: all 0.15s ease;
     border: 2px dashed transparent;
     flex-shrink: 0;
 }
 
 .column-drop-top.drag-over-top {
-    min-height: 32px;
+    min-height: 44px;
     background-color: rgba(59, 130, 246, 0.12);
     border-color: #3b82f6;
 }
@@ -103,29 +103,19 @@
     display: block;
     text-align: center;
     color: #3b82f6;
-    font-size: 0.72rem;
+    font-size: 0.75rem;
     font-weight: 600;
-    line-height: 28px;
+    line-height: 40px;
 }
 
-/* ── 모바일 터치 고스트 ── */
+/* ── 모바일 터치 드래그 고스트 ── */
 .touch-drag-ghost {
     position: fixed !important;
     z-index: 9999 !important;
     pointer-events: none !important;
-    opacity: 0.8;
-    /* ★ 기울기 제거, 원본과 동일한 형태 */
-    transform: none;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    opacity: 0.85;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
     border-radius: 6px;
     background: white;
     transition: none !important;
-}
-
-/* ── 모바일 터치 시 브라우저 기본 동작 방지 ── */
-.task-node-self {
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    user-select: none;
-    touch-action: auto;
 }
