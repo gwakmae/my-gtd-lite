@@ -46,13 +46,11 @@ class BoardView {
         var board = document.createElement('div');
         board.className = 'board-container';
 
-        // Today column
         var todayTasks = this.ds.getTodayTasks();
         var todayCol = this._renderColumn('오늘 할 일', todayTasks, null, true);
         todayCol.classList.add('today-column');
         board.appendChild(todayCol);
 
-        // Status columns
         for (var s = 0; s < TaskStatusList.length; s++) {
             var status = TaskStatusList[s];
             var tasks = this.ds.getTasksForStatus(status);
@@ -174,8 +172,7 @@ class BoardView {
 
         var filteredTasks = this._filterTasks(tasks);
 
-        // Column header
-        if (status === 'Completed') {
+        if (status === TaskStatus.Completed) {
             var headerDiv = document.createElement('div');
             headerDiv.className = 'column-header-with-action';
             var h3 = document.createElement('h3');
@@ -201,13 +198,11 @@ class BoardView {
             col.appendChild(h3);
         }
 
-        // Task list
         var taskList = document.createElement('div');
         taskList.className = 'task-list';
 
-        var trees = this.ds.buildTree(filteredTasks);
-        for (var i = 0; i < trees.length; i++) {
-            var node = this.nodeRenderer.render(trees[i], {
+        for (var i = 0; i < filteredTasks.length; i++) {
+            var node = this.nodeRenderer.render(filteredTasks[i], {
                 hideCompleted: this.hideCompleted,
                 showHidden: this.showHidden,
                 selectedIds: this.selectedIds,
@@ -218,7 +213,6 @@ class BoardView {
 
         col.appendChild(taskList);
 
-        // Drop zone for column
         if (status && !isTodayCol) {
             var self = this;
             taskList.addEventListener('dragover', function(e) {
@@ -240,12 +234,11 @@ class BoardView {
             });
         }
 
-        // Add task button
-        if (status && status !== 'Completed' && !isTodayCol) {
+        if (status && status !== TaskStatus.Completed && !isTodayCol) {
+            var self = this;
             var addBtn = document.createElement('button');
             addBtn.className = 'add-task-btn';
             addBtn.textContent = '+ Add Task';
-            var self = this;
             addBtn.addEventListener('click', function() { self._showQuickAdd(col, status, addBtn); });
             col.appendChild(addBtn);
         }
@@ -254,11 +247,12 @@ class BoardView {
     }
 
     _filterTasks(tasks) {
+        var self = this;
         return tasks.filter(function(t) {
-            if (this.hideCompleted && t.IsCompleted) return false;
-            if (!this.showHidden && t.IsHidden) return false;
+            if (self.hideCompleted && t.IsCompleted) return false;
+            if (!self.showHidden && t.IsHidden) return false;
             return true;
-        }.bind(this));
+        });
     }
 
     _showQuickAdd(column, status, addBtn) {
@@ -361,7 +355,8 @@ class BoardView {
             this.isMultiSelectMode = this.selectedIds.size > 0;
         } else if (e.shiftKey && this.lastClickedId !== null) {
             var list = this.renderedTasks;
-            var startIdx = list.findIndex(function(t) { return t.Id === this.lastClickedId; }.bind(this));
+            var self = this;
+            var startIdx = list.findIndex(function(t) { return t.Id === self.lastClickedId; });
             var endIdx = list.findIndex(function(t) { return t.Id === taskId; });
             if (startIdx !== -1 && endIdx !== -1) {
                 var from = Math.min(startIdx, endIdx);
@@ -392,9 +387,10 @@ class BoardView {
 
     _deleteTask(taskId) {
         var snapshot = this.ds.deleteTask(taskId);
+        var self = this;
         this.undo.push({
             description: '작업 삭제됨',
-            undo: function() { this.ds.restoreTasks(snapshot); }.bind(this)
+            undo: function() { self.ds.restoreTasks(snapshot); }
         });
     }
 
@@ -438,7 +434,8 @@ class BoardView {
             var delBtn = document.getElementById('bulk-delete-btn');
             if (delBtn) delBtn.addEventListener('click', function() {
                 if (confirm(self.selectedIds.size + '개의 항목을 삭제하시겠습니까?')) {
-                    var snapshot = self.ds.deleteTasks([...self.selectedIds]);
+                    var ids = Array.from(self.selectedIds);
+                    var snapshot = self.ds.deleteTasks(ids);
                     self.undo.push({
                         description: snapshot.length + '개 작업 삭제됨',
                         undo: function() { self.ds.restoreTasks(snapshot); }
@@ -461,19 +458,19 @@ class BoardView {
 
     _buildRenderedList() {
         var all = [];
-        for (var s = 0; s < TaskStatusList.length; s++) {
-            var tasks = this.ds.getTasksForStatus(TaskStatusList[s]);
-            var filtered = this._filterTasks(tasks);
-            var trees = this.ds.buildTree(filtered);
-            var flatten = function(list) {
-                for (var i = 0; i < list.length; i++) {
-                    all.push(list[i]);
-                    if (list[i].Children && list[i].Children.length > 0 && list[i].IsExpanded) {
-                        flatten(list[i].Children);
-                    }
+        var self = this;
+        var flatten = function(list) {
+            for (var i = 0; i < list.length; i++) {
+                all.push(list[i]);
+                if (list[i].Children && list[i].Children.length > 0 && list[i].IsExpanded) {
+                    flatten(list[i].Children);
                 }
-            };
-            flatten(trees);
+            }
+        };
+        for (var s = 0; s < TaskStatusList.length; s++) {
+            var tasks = self.ds.getTasksForStatus(TaskStatusList[s]);
+            var filtered = self._filterTasks(tasks);
+            flatten(filtered);
         }
         return all;
     }
