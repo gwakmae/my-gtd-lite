@@ -18,80 +18,45 @@
     <link rel="stylesheet" href="css/animations.css" />
     <style>
         .login-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10000;
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); display: flex; align-items: center;
+            justify-content: center; z-index: 10000;
         }
-
         .login-box {
-            background: var(--bg-primary, #fff);
-            border-radius: 16px;
-            padding: 40px;
-            text-align: center;
-            max-width: 360px;
-            width: 90%;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            background: var(--bg-primary, #fff); border-radius: 16px;
+            padding: 40px; text-align: center; max-width: 360px; width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
         }
-
-        .login-box h2 {
-            margin: 0 0 8px;
-            font-size: 24px;
-        }
-
-        .login-box p {
-            margin: 0 0 24px;
-            color: var(--text-secondary, #666);
-            font-size: 14px;
-        }
-
+        .login-box h2 { margin: 0 0 8px; font-size: 24px; }
+        .login-box p { margin: 0 0 24px; color: var(--text-secondary, #666); font-size: 14px; }
         .login-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 12px 24px;
-            border: 1px solid var(--border-color, #ddd);
-            border-radius: 8px;
-            background: var(--bg-primary, #fff);
-            cursor: pointer;
-            font-size: 14px;
-            transition: background 0.2s;
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 12px 24px; border: 1px solid var(--border-color, #ddd);
+            border-radius: 8px; background: var(--bg-primary, #fff);
+            cursor: pointer; font-size: 14px; transition: background 0.2s;
         }
-
-        .login-btn:hover {
-            background: var(--bg-secondary, #f5f5f5);
-        }
-
-        .login-btn svg {
-            width: 18px;
-            height: 18px;
-        }
-
+        .login-btn:hover { background: var(--bg-secondary, #f5f5f5); }
+        .login-btn svg { width: 18px; height: 18px; }
         .offline-badge {
-            display: none;
-            position: fixed;
-            top: 12px;
-            right: 12px;
-            background: var(--bg-tertiary, #e0e0e0);
-            color: var(--text-secondary, #666);
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 12px;
-            z-index: 9999;
+            display: none; position: fixed; top: 12px; right: 12px;
+            background: var(--bg-tertiary, #e0e0e0); color: var(--text-secondary, #666);
+            padding: 4px 12px; border-radius: 12px; font-size: 12px; z-index: 9999;
         }
-
         .sync-status {
-            font-size: 11px;
-            color: var(--text-tertiary, #999);
-            padding: 4px 12px;
+            font-size: 11px; color: var(--text-tertiary, #999);
+            padding: 4px 12px; display: none;
+        }
+        .app-header {
+            display: flex; align-items: center; padding: 0.5rem 1rem;
+            border-bottom: 1px solid var(--border-color, #e0e0e0);
+            background: var(--bg-primary, #fff); flex-shrink: 0;
+        }
+        .sidebar-toggle {
+            background: none; border: none; font-size: 1.5rem;
+            cursor: pointer; padding: 0.25rem 0.5rem; margin-right: 0.5rem;
             display: none;
         }
+        .header-title { font-size: 1.1rem; font-weight: 600; margin: 0; }
     </style>
 </head>
 
@@ -101,16 +66,7 @@
             <h2>GTD Board</h2>
             <p>Google 계정으로 로그인하면<br>모든 기기에서 데이터가 동기화됩니다</p>
             <button id="login-btn" class="login-btn">
-                <svg viewBox="0 0 24 24">
-                    <path fill="#4285F4"
-                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z" />
-                    <path fill="#34A853"
-                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
-                    <path fill="#FBBC05"
-                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
-                    <path fill="#EA4335"
-                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
-                </svg>
+                <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
                 Google로 로그인
             </button>
         </div>
@@ -118,23 +74,25 @@
     <div id="offline-badge" class="offline-badge">오프라인 모드</div>
     <div id="sync-status" class="sync-status"></div>
 
-    <header class="app-header">
-        <button class="sidebar-toggle" id="sidebar-toggle">☰</button>
-        <h1 class="header-title" id="header-title">GTD Board</h1>
-        <div class="header-actions" id="header-actions"></div>
-    </header>
+    <div class="page">
+        <aside class="sidebar" id="sidebar">
+            <div class="navmenu" id="sidebar-nav"></div>
+        </aside>
+        <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
-    <aside class="sidebar" id="sidebar">
-        <nav class="sidebar-nav" id="sidebar-nav"></nav>
-    </aside>
-
-    <div class="sidebar-overlay" id="sidebar-overlay"></div>
-
-    <main class="main-content" id="content-area"></main>
+        <main>
+            <div class="content" id="content-area"></div>
+        </main>
+    </div>
 
     <div id="toast-container" class="toast-container"></div>
 
-    <!-- 앱 JS: 순서 중요! -->
+    <div class="undo-snackbar" id="undo-snackbar" style="display:none;">
+        <span id="undo-message"></span>
+        <button class="undo-btn" id="undo-btn">실행취소</button>
+        <button class="close-btn" id="undo-close-btn">×</button>
+    </div>
+
     <script src="js/enums.js"></script>
     <script src="js/models.js"></script>
     <script src="js/dataService.js"></script>
@@ -148,16 +106,13 @@
     <script src="js/bulkEdit.js"></script>
     <script src="js/app.js"></script>
 
-    <!-- Firebase: 온라인이면 로드, 오프라인이면 무시 -->
     <script>
         (function () {
-            // Firebase SDK를 동적으로 로드 시도
             var scripts = [
                 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js',
                 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js',
                 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js'
             ];
-            var loaded = 0;
             var failed = false;
 
             function onAllLoaded() {
@@ -171,35 +126,25 @@
                         messagingSenderId: "922209539844",
                         appId: "1:922209539844:web:fd3efef89b14396d15a251"
                     };
-                    var fbApp = firebase.initializeApp(firebaseConfig);
+                    firebase.initializeApp(firebaseConfig);
                     window._firebase = {
                         auth: firebase.auth(),
                         db: firebase.firestore(),
                         provider: new firebase.auth.GoogleAuthProvider()
                     };
-                    console.log('Firebase loaded successfully');
-                    // Firebase 준비 완료 이벤트 발생
                     document.dispatchEvent(new Event('firebase-ready'));
                 } catch (e) {
-                    console.warn('Firebase init error:', e);
                     document.dispatchEvent(new Event('firebase-failed'));
                 }
             }
 
             function loadNext(i) {
-                if (i >= scripts.length) {
-                    onAllLoaded();
-                    return;
-                }
+                if (i >= scripts.length) { onAllLoaded(); return; }
                 var s = document.createElement('script');
                 s.src = scripts[i];
-                s.onload = function () {
-                    loaded++;
-                    loadNext(i + 1);
-                };
+                s.onload = function () { loadNext(i + 1); };
                 s.onerror = function () {
                     failed = true;
-                    console.warn('Firebase CDN blocked or offline');
                     document.dispatchEvent(new Event('firebase-failed'));
                 };
                 document.head.appendChild(s);
@@ -207,11 +152,9 @@
 
             loadNext(0);
 
-            // 3초 타임아웃 - CDN이 느리거나 응답 없을 때
             setTimeout(function () {
                 if (!window._firebase && !failed) {
                     failed = true;
-                    console.warn('Firebase load timeout');
                     document.dispatchEvent(new Event('firebase-failed'));
                 }
             }, 3000);
