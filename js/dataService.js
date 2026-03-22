@@ -18,7 +18,6 @@ class DataService {
         this._loadFromLocalStorage();
     }
 
-    // ─── Firebase (compat SDK) ───
     async enableFirebase(userId) {
         this._useFirebase = true;
         this._userId = userId;
@@ -37,7 +36,6 @@ class DataService {
             if (snap.exists) {
                 var data = snap.data();
                 var remoteTasks = (data.tasks || []).map(function(t) { return new TaskItem(t); });
-
                 if (remoteTasks.length > 0) {
                     this._tasks = remoteTasks;
                     this._recalcNextId();
@@ -55,7 +53,6 @@ class DataService {
                 }
             }
 
-            // 실시간 리스너
             this._unsubscribe = docRef.onSnapshot((snap) => {
                 if (this._isSyncing) return;
                 if (snap.exists) {
@@ -100,7 +97,6 @@ class DataService {
         }
     }
 
-    // ─── Load / Save ───
     _loadFromLocalStorage() {
         var saved = localStorage.getItem(this._storageKey);
         if (saved) {
@@ -133,7 +129,7 @@ class DataService {
 
     _recalcNextId() {
         if (this._tasks.length > 0) {
-            this._nextId = Math.max(...this._tasks.map(function(t) { return t.Id; })) + 1;
+            this._nextId = Math.max.apply(null, this._tasks.map(function(t) { return t.Id; })) + 1;
         }
     }
 
@@ -184,20 +180,31 @@ class DataService {
     _saveAndNotify() { this.save(); this._notify(); }
 
     // ─── Tree Building ───
-    buildTree() {
+    // 전체 태스크를 트리로 구성 (루트만 반환, Children에 자식 포함)
+    buildTree(taskList) {
+        var tasks = taskList || this._tasks;
+        // Children 초기화
+        for (var i = 0; i < tasks.length; i++) {
+            tasks[i].Children = [];
+        }
         var map = {};
-        this._tasks.forEach(function(t) { t.Children = []; map[t.Id] = t; });
+        for (var i = 0; i < tasks.length; i++) {
+            map[tasks[i].Id] = tasks[i];
+        }
         var roots = [];
-        this._tasks.forEach(function(t) {
+        for (var i = 0; i < tasks.length; i++) {
+            var t = tasks[i];
             if (t.ParentId != null && map[t.ParentId]) {
                 map[t.ParentId].Children.push(t);
             } else {
                 roots.push(t);
             }
-        });
+        }
         var sortRec = function(items) {
             items.sort(function(a, b) { return a.SortOrder - b.SortOrder; });
-            items.forEach(function(i) { sortRec(i.Children); });
+            for (var j = 0; j < items.length; j++) {
+                sortRec(items[j].Children);
+            }
         };
         sortRec(roots);
         return roots;
@@ -208,26 +215,35 @@ class DataService {
     getRawTasks() { return this._tasks; }
     getById(id) { return this._tasks.find(function(t) { return t.Id === id; }) || null; }
 
+    // 특정 Status에 해당하는 태스크만 추출하여 트리 구성
     getTasksForStatus(status) {
-        return this.buildTree().filter(function(t) { return t.Status === status; });
+        // 해당 status의 태스크만 모아서 독립적으로 트리 구성
+        var statusTasks = this._tasks.filter(function(t) { return t.Status === status; });
+        return this.buildTree(statusTasks);
     }
 
     getTodayTasks() {
         var today = new Date(); today.setHours(0, 0, 0, 0);
-        return this._tasks.filter(function(t) {
+        var flat = this._tasks.filter(function(t) {
             return !t.IsCompleted && t.StartDate && new Date(t.StartDate) <= today;
         }).sort(function(a, b) {
             var da = a.DueDate ? new Date(a.DueDate) : new Date(9999, 0);
             var db = b.DueDate ? new Date(b.DueDate) : new Date(9999, 0);
             return da - db;
         });
+        // Today는 플랫 리스트로 반환 (트리X, 개별 태스크)
+        // Children을 빈 배열로 설정해서 nodeRenderer가 에러 안 나게
+        for (var i = 0; i < flat.length; i++) {
+            flat[i].Children = flat[i].Children || [];
+        }
+        return flat;
     }
 
     getFocusTasks() {
         var soon = new Date();
         soon.setDate(soon.getDate() + 3);
         soon.setHours(23, 59, 59);
-        return this._tasks.filter(function(t) {
+        var flat = this._tasks.filter(function(t) {
             return !t.IsCompleted &&
                 (t.Priority === Priority.High || (t.DueDate && new Date(t.DueDate) <= soon));
         }).sort(function(a, b) {
@@ -236,13 +252,16 @@ class DataService {
             if (da - db !== 0) return da - db;
             return PriorityList.indexOf(b.Priority) - PriorityList.indexOf(a.Priority);
         });
+        for (var i = 0; i < flat.length; i++) {
+            flat[i].Children = flat[i].Children || [];
+        }
+        return flat;
     }
 
     getActiveTasks(showHidden) {
         var today = new Date(); today.setHours(0, 0, 0, 0);
         var tree = this.buildTree();
         var result = [];
-        var self = this;
         var walk = function(items, parentHidden) {
             for (var i = 0; i < items.length; i++) {
                 var t = items[i];
@@ -263,24 +282,28 @@ class DataService {
     }
 
     getTasksByContext(context) {
-        return this._tasks.filter(function(t) {
+        var flat = this._tasks.filter(function(t) {
             return !t.IsCompleted && t.Contexts.some(function(c) { return c.toLowerCase() === context.toLowerCase(); });
         }).sort(function(a, b) {
             var si = TaskStatusList.indexOf(a.Status) - TaskStatusList.indexOf(b.Status);
             return si !== 0 ? si : a.SortOrder - b.SortOrder;
         });
+        for (var i = 0; i < flat.length; i++) {
+            flat[i].Children = flat[i].Children || [];
+        }
+        return flat;
     }
 
     getAllContexts() {
         var ctxSet = new Set();
         this._tasks.forEach(function(t) { t.Contexts.forEach(function(c) { ctxSet.add(c); }); });
-        return [...ctxSet].sort();
+        return Array.from(ctxSet).sort();
     }
 
     // ─── Mutations ───
     addTask(title, status, parentId) {
         var siblings = this._tasks.filter(function(t) { return t.ParentId === parentId && t.Status === status; });
-        var maxSort = siblings.length > 0 ? Math.max(...siblings.map(function(s) { return s.SortOrder; })) : -1;
+        var maxSort = siblings.length > 0 ? Math.max.apply(null, siblings.map(function(s) { return s.SortOrder; })) : -1;
         var task = new TaskItem({
             Id: this._nextId++,
             Title: title,
@@ -360,7 +383,7 @@ class DataService {
             this._tasks = this._tasks.filter(function(x) { return x.Id !== t.Id; });
             this._tasks.push(new TaskItem(t));
         }
-        this._nextId = Math.max(this._nextId, ...this._tasks.map(function(t) { return t.Id; })) + 1;
+        this._nextId = Math.max(this._nextId, Math.max.apply(null, this._tasks.map(function(t) { return t.Id; }))) + 1;
         this._saveAndNotify();
     }
 
@@ -427,13 +450,15 @@ class DataService {
             rootTasks[i].ParentId = newParentId;
         }
 
-        var destSiblings = this._tasks.filter(function(t) {
-            return t.ParentId === newParentId && t.Status === newStatus && !allAffectedIds.has(t.Id);
-        }).sort(function(a, b) { return a.SortOrder - b.SortOrder; });
+        if (typeof newSortOrder === 'number') {
+            var destSiblings = this._tasks.filter(function(t) {
+                return t.ParentId === newParentId && t.Status === newStatus && !allAffectedIds.has(t.Id);
+            }).sort(function(a, b) { return a.SortOrder - b.SortOrder; });
 
-        var clampedSort = Math.max(0, Math.min(newSortOrder, destSiblings.length));
-        destSiblings.splice(clampedSort, 0, ...rootTasks);
-        destSiblings.forEach(function(t, i) { t.SortOrder = i; });
+            var clampedSort = Math.max(0, Math.min(newSortOrder, destSiblings.length));
+            destSiblings.splice(clampedSort, 0, ...rootTasks);
+            destSiblings.forEach(function(t, i) { t.SortOrder = i; });
+        }
 
         var groups = {};
         this._tasks.forEach(function(t) {
@@ -531,7 +556,7 @@ class DataService {
             if (!tasks[i].Title || tasks[i].Title.trim() === '') throw new Error('ID ' + tasks[i].Id + '의 제목이 비어있습니다.');
         }
         this._tasks = tasks.map(function(t) { return new TaskItem(t); });
-        this._nextId = Math.max(...this._tasks.map(function(t) { return t.Id; })) + 1;
+        this._nextId = Math.max.apply(null, this._tasks.map(function(t) { return t.Id; })) + 1;
         this._saveAndNotify();
     }
 
