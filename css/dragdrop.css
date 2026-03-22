@@ -1,22 +1,32 @@
-.task-node-self.drop-above {
-    border-top-color: var(--primary-color);
-}
-
-.task-node-self.drop-below {
-    border-bottom-color: var(--primary-color);
-}
-
-.task-node-self.drop-inside {
-    background-color: rgba(59, 130, 246, 0.15);
-    outline: 2px solid var(--primary-color);
-}
-
-.task-node-self.drop-invalid {
-    cursor: not-allowed;
+/* 드래그 소스 */
+.task-node-self.is-dragging-source {
     opacity: 0.4;
+    transform: scale(0.98);
 }
 
-.task-node-self.drop-above::before,
+/* 형제(위) - 파란 선 */
+.task-node-self.drop-above {
+    border-top-color: #3b82f6;
+}
+
+.task-node-self.drop-above::before {
+    content: '';
+    position: absolute;
+    left: -6px;
+    right: -6px;
+    height: 3px;
+    background: #3b82f6;
+    border-radius: 3px;
+    pointer-events: none;
+    top: -3px;
+    z-index: 10;
+}
+
+/* 형제(아래) - 파란 선 */
+.task-node-self.drop-below {
+    border-bottom-color: #3b82f6;
+}
+
 .task-node-self.drop-below::after {
     content: '';
     position: absolute;
@@ -26,22 +36,67 @@
     background: #3b82f6;
     border-radius: 3px;
     pointer-events: none;
-}
-
-.task-node-self.drop-above::before {
-    top: -3px;
-}
-
-.task-node-self.drop-below::after {
     bottom: -3px;
+    z-index: 10;
 }
 
-.task-node-self.drag-ready {
-    background-color: rgba(59, 130, 246, 0.05);
-    outline: 2px dashed rgba(59, 130, 246, 0.5);
+/* 자식 - 점선 테두리 + 라벨 */
+.task-node-self.drop-inside {
+    background-color: rgba(59, 130, 246, 0.08);
+    outline: 2px dashed #3b82f6;
+    outline-offset: -2px;
 }
 
-.task-node-self.is-dragging-source {
+.task-node-self.drop-inside::after {
+    content: '▸ 하위로 이동';
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: #3b82f6;
+    color: white;
+    font-size: 0.65rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    pointer-events: none;
+    z-index: 10;
+    white-space: nowrap;
+}
+
+/* 드롭 불가 */
+.task-node-self.drop-invalid {
+    cursor: not-allowed;
     opacity: 0.4;
-    transform: scale(0.98);
+}
+
+/* 칼럼 드롭 존 */
+.task-list.drag-over-column {
+    background-color: rgba(59, 130, 246, 0.05);
+    outline: 2px dashed rgba(59, 130, 246, 0.3);
+    outline-offset: -2px;
+    border-radius: 6px;
+}
+
+/* 칼럼 상단 드롭 존 */
+.column-drop-top {
+    height: 24px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+    transition: background-color 0.15s, border-color 0.15s;
+    border: 2px dashed transparent;
+    flex-shrink: 0;
+}
+
+.column-drop-top.drag-over-top {
+    background-color: rgba(59, 130, 246, 0.1);
+    border-color: #3b82f6;
+}
+
+.column-drop-top.drag-over-top::after {
+    content: '여기에 놓기';
+    display: block;
+    text-align: center;
+    color: #3b82f6;
+    font-size: 0.7rem;
+    line-height: 20px;
 }
