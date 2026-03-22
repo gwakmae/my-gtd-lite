@@ -4,72 +4,51 @@
     transform: scale(0.98);
 }
 
-/* 형제(위) - 파란 선 */
+/* ── 형제(위) - 파란 선 ── */
 .task-node-self.drop-above {
-    border-top-color: #3b82f6;
+    position: relative;
+    border-top: 3px solid #3b82f6 !important;
 }
 
 .task-node-self.drop-above::before {
     content: '';
     position: absolute;
-    left: -6px;
-    right: -6px;
+    left: -4px;
+    right: -4px;
+    top: -3px;
     height: 3px;
     background: #3b82f6;
     border-radius: 3px;
     pointer-events: none;
-    top: -3px;
     z-index: 10;
 }
 
-/* 형제(아래) - 파란 선 */
+/* ── 형제(아래) - 파란 선 ── */
 .task-node-self.drop-below {
-    border-bottom-color: #3b82f6;
+    position: relative;
+    border-bottom: 3px solid #3b82f6 !important;
 }
 
 .task-node-self.drop-below::after {
     content: '';
     position: absolute;
-    left: -6px;
-    right: -6px;
+    left: -4px;
+    right: -4px;
+    bottom: -3px;
     height: 3px;
     background: #3b82f6;
     border-radius: 3px;
     pointer-events: none;
-    bottom: -3px;
     z-index: 10;
 }
 
-/* 자식 - 점선 테두리 + 라벨 */
-.task-node-self.drop-inside {
-    background-color: rgba(59, 130, 246, 0.08);
-    outline: 2px dashed #3b82f6;
-    outline-offset: -2px;
-}
-
-.task-node-self.drop-inside::after {
-    content: '▸ 하위로 이동';
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
-    background: #3b82f6;
-    color: white;
-    font-size: 0.65rem;
-    padding: 2px 6px;
-    border-radius: 4px;
-    pointer-events: none;
-    z-index: 10;
-    white-space: nowrap;
-}
-
-/* 드롭 불가 */
+/* ── 드롭 불가 ── */
 .task-node-self.drop-invalid {
     cursor: not-allowed;
     opacity: 0.4;
 }
 
-/* 칼럼 드롭 존 */
+/* ── 칼럼 빈 영역 드롭 ── */
 .task-list.drag-over-column {
     background-color: rgba(59, 130, 246, 0.05);
     outline: 2px dashed rgba(59, 130, 246, 0.3);
@@ -77,26 +56,28 @@
     border-radius: 6px;
 }
 
-/* 칼럼 상단 드롭 존 */
+/* ── 칼럼 상단 드롭존 ── */
 .column-drop-top {
-    height: 24px;
+    min-height: 12px;
     border-radius: 4px;
     margin-bottom: 4px;
-    transition: background-color 0.15s, border-color 0.15s;
+    transition: all 0.15s ease;
     border: 2px dashed transparent;
     flex-shrink: 0;
 }
 
 .column-drop-top.drag-over-top {
-    background-color: rgba(59, 130, 246, 0.1);
+    min-height: 32px;
+    background-color: rgba(59, 130, 246, 0.12);
     border-color: #3b82f6;
 }
 
 .column-drop-top.drag-over-top::after {
-    content: '여기에 놓기';
+    content: '▲ 맨 위에 놓기';
     display: block;
     text-align: center;
     color: #3b82f6;
-    font-size: 0.7rem;
-    line-height: 20px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 28px;
 }
