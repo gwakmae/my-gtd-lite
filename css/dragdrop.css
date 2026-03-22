@@ -1,0 +1,47 @@
+.task-node-self.drop-above {
+    border-top-color: var(--primary-color);
+}
+
+.task-node-self.drop-below {
+    border-bottom-color: var(--primary-color);
+}
+
+.task-node-self.drop-inside {
+    background-color: rgba(59, 130, 246, 0.15);
+    outline: 2px solid var(--primary-color);
+}
+
+.task-node-self.drop-invalid {
+    cursor: not-allowed;
+    opacity: 0.4;
+}
+
+.task-node-self.drop-above::before,
+.task-node-self.drop-below::after {
+    content: '';
+    position: absolute;
+    left: -6px;
+    right: -6px;
+    height: 3px;
+    background: #3b82f6;
+    border-radius: 3px;
+    pointer-events: none;
+}
+
+.task-node-self.drop-above::before {
+    top: -3px;
+}
+
+.task-node-self.drop-below::after {
+    bottom: -3px;
+}
+
+.task-node-self.drag-ready {
+    background-color: rgba(59, 130, 246, 0.05);
+    outline: 2px dashed rgba(59, 130, 246, 0.5);
+}
+
+.task-node-self.is-dragging-source {
+    opacity: 0.4;
+    transform: scale(0.98);
+}

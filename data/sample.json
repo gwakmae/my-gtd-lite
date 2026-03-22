@@ -1,0 +1,80 @@
+{
+    "tasks": [
+        {
+            "Id": 1,
+            "Title": "새로운 Blazor 프로젝트 구상",
+            "Status": "Inbox",
+            "Priority": "High",
+            "SortOrder": 0
+        },
+        {
+            "Id": 2,
+            "Title": "우유 사기",
+            "Status": "NextActions",
+            "Priority": "Low",
+            "SortOrder": 0,
+            "Contexts": [
+                "@Market"
+            ]
+        },
+        {
+            "Id": 3,
+            "Title": "이메일 답장하기",
+            "Status": "NextActions",
+            "Priority": "Medium",
+            "SortOrder": 1,
+            "Contexts": [
+                "@Office",
+                "@Email"
+            ]
+        },
+        {
+            "Id": 4,
+            "Title": "GTD 앱 개발 프로젝트",
+            "Status": "Projects",
+            "Priority": "High",
+            "SortOrder": 0,
+            "Contexts": [
+                "@Home"
+            ]
+        },
+        {
+            "Id": 5,
+            "Title": "여름 휴가 계획",
+            "Status": "Projects",
+            "Priority": "Medium",
+            "SortOrder": 1
+        },
+        {
+            "Id": 6,
+            "Title": "스페인어 배우기",
+            "Status": "Someday",
+            "Priority": "Low",
+            "SortOrder": 0
+        },
+        {
+            "Id": 101,
+            "Title": "UI/UX 디자인",
+            "Status": "Projects",
+            "Priority": "Medium",
+            "ParentId": 4,
+            "SortOrder": 0
+        },
+        {
+            "Id": 102,
+            "Title": "백엔드 개발",
+            "Status": "Projects",
+            "Priority": "Medium",
+            "ParentId": 4,
+            "SortOrder": 1
+        },
+        {
+            "Id": 201,
+            "Title": "데이터베이스 설계",
+            "Status": "Projects",
+            "Priority": "Medium",
+            "ParentId": 102,
+            "SortOrder": 0
+        }
+    ]
+}

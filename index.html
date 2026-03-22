@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GTD Board</title>
+    <link rel="stylesheet" href="css/variables.css" />
+    <link rel="stylesheet" href="css/base.css" />
+    <link rel="stylesheet" href="css/layout.css" />
+    <link rel="stylesheet" href="css/header.css" />
+    <link rel="stylesheet" href="css/components.css" />
+    <link rel="stylesheet" href="css/board.css" />
+    <link rel="stylesheet" href="css/modal.css" />
+    <link rel="stylesheet" href="css/dragdrop.css" />
+    <link rel="stylesheet" href="css/sidebar.css" />
+    <link rel="stylesheet" href="css/responsive.css" />
+    <link rel="stylesheet" href="css/animations.css" />
+    <style>
+        /* Login overlay */
+        .login-overlay {
+            position: fixed;
+            inset: 0;
+            background: var(--gradient-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .login-overlay.hidden {
+            display: none;
+        }
+
+        .login-box {
+            background: white;
+            border-radius: 16px;
+            padding: 3rem 2.5rem;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .login-box h1 {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+            color: var(--primary-900);
+        }
+
+        .login-box p {
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+            font-size: 0.95rem;
+        }
+
+        .login-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.8rem 2rem;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            background: white;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: var(--text-primary);
+        }
+
+        .login-btn:hover {
+            border-color: var(--primary-color);
+            background: #f8f9ff;
+        }
+
+        .login-btn .g-icon {
+            font-size: 1.3rem;
+        }
+
+        .offline-badge {
+            position: fixed;
+            top: 12px;
+            right: 12px;
+            background: #f59e0b;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            z-index: 10000;
+            display: none;
+        }
+
+        .offline-badge.visible {
+            display: block;
+        }
+
+        .sync-status {
+            position: fixed;
+            bottom: 12px;
+            left: 12px;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            z-index: 10000;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Login overlay (Firebase 사용 시) -->
+    <div id="login-overlay" class="login-overlay hidden">
+        <div class="login-box">
+            <h1>▦ GTD Board</h1>
+            <p>Getting Things Done — 어디서든 동기화</p>
+            <button class="login-btn" id="login-google-btn">
+                <span class="g-icon">G</span> Google로 로그인
+            </button>
+            <p style="margin-top:1.5rem; font-size:0.8rem; color:#999;">
+                로그인하면 모든 기기에서 데이터가 동기화됩니다.
+            </p>
+        </div>
+    </div>
+
+    <!-- Offline badge -->
+    <div id="offline-badge" class="offline-badge">오프라인 모드</div>
+
+    <!-- Sync status -->
+    <div id="sync-status" class="sync-status"></div>
+
+    <div id="app" class="page">
+        <!-- Sidebar -->
+        <div id="sidebar" class="sidebar">
+            <div class="navmenu" id="nav-menu"></div>
+        </div>
+        <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+
+        <!-- Main -->
+        <main id="main-content">
+            <div class="mobile-header" id="mobile-header">
+                <button class="sidebar-toggle-btn" id="hamburger-btn">
+                    <span class="icon-hamburger">☰</span>
+                </button>
+                <span class="mobile-header-title">GTD Board</span>
+            </div>
+            <article class="content px-4" id="content-area"></article>
+        </main>
+    </div>
+
+    <!-- Toast container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Undo Snackbar -->
+    <div id="undo-snackbar" class="undo-snackbar" style="display:none;">
+        <span id="undo-message"></span>
+        <button class="undo-btn" id="undo-btn">실행 취소</button>
+        <button class="close-btn" id="undo-close-btn">×</button>
+    </div>
+
+    <!-- Firebase SDK (CDN) — 로컬 파일에서는 로드 실패해도 앱 정상 동작 -->
+    <script type="module">
+        // Firebase 모듈 로드 시도
+        let firebaseReady = false;
+        let firebaseAuth = null;
+        let firebaseDb = null;
+
+        try {
+            const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js');
+            const { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
+            const { getFirestore, doc, getDoc, setDoc, onSnapshot } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+
+            // ★★★ 여기에 본인의 firebaseConfig를 붙여넣으세요 ★★★
+            const firebaseConfig = {
+                apiKey: "AIzaSy...",
+                authDomain: "my-gtd-xxxxx.firebaseapp.com",
+                projectId: "my-gtd-xxxxx",
+                storageBucket: "my-gtd-xxxxx.appspot.com",
+                messagingSenderId: "123456789",
+                appId: "1:123456789:web:abcdef"
+            };
+
+            const fbApp = initializeApp(firebaseConfig);
+            const auth = getAuth(fbApp);
+            const db = getFirestore(fbApp);
+
+            // 전역에 Firebase 기능 노출
+            window._firebase = {
+                ready: true,
+                auth, db, doc, getDoc, setDoc, onSnapshot,
+                signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut
+            };
+
+            firebaseReady = true;
+            console.log('[Firebase] SDK loaded successfully');
+        } catch (e) {
+            console.warn('[Firebase] SDK load failed, falling back to localStorage:', e.message);
+            window._firebase = { ready: false };
+        }
+
+        // Firebase 로드 상태와 관계없이 앱 JS 로드
+        const scripts = [
+            'js/enums.js', 'js/models.js', 'js/dataService.js', 'js/undoService.js',
+            'js/toast.js', 'js/taskNode.js', 'js/taskModal.js', 'js/bulkEdit.js',
+            'js/dragDrop.js', 'js/boardView.js', 'js/listView.js', 'js/app.js'
+        ];
+        for (const src of scripts) {
+            await new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = src;
+                s.onload = resolve;
+                s.onerror = reject;
+                document.body.appendChild(s);
+            });
+        }
+    </script>
+</body>
+
+</html>
