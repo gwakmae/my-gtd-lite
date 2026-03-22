@@ -1,71 +1,74 @@
+/* ===========================
+   responsive.css – Fold 5 최적화
+   =========================== */
+
+/* ─────────────────────────────
+   1. 태블릿 & 접힌 폴더블 (≤1199px)
+   사이드바 오프캔버스, 모바일 헤더 표시
+   ───────────────────────────── */
 @media (max-width: 1199.98px) {
     .sidebar {
         position: fixed;
+        left: -260px;
         top: 0;
-        left: 0;
         bottom: 0;
         width: 250px;
-        transform: translateX(-100%);
-        transition: transform 0.3s;
-        z-index: 1060;
+        z-index: 1000;
+        transition: left 0.3s ease;
     }
 
     .sidebar.is-open {
-        transform: translateX(0);
-    }
-
-    .sidebar-backdrop {
-        display: block;
-        position: fixed;
-        top: 0;
         left: 0;
-        width: 100vw;
-        height: 100vh;
-        background-color: rgba(0, 0, 0, 0.5);
-        z-index: 1050;
-        opacity: 0;
-        transition: opacity 0.3s;
-        pointer-events: none;
     }
 
-    .sidebar-backdrop.is-open {
+    .sidebar-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        z-index: 999;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .sidebar-overlay.is-open {
+        display: block;
         opacity: 1;
-        pointer-events: auto;
     }
 
     .mobile-header {
-        display: flex;
+        display: flex !important;
         align-items: center;
-        background-color: #fff;
-        padding: 0.75rem 1rem;
-        border-bottom: 1px solid #e9ecef;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-        z-index: 1040;
-        flex-shrink: 0;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        background: #fff;
+        border-bottom: 1px solid var(--border-color, #e0e0e0);
+        position: sticky;
+        top: 0;
+        z-index: 50;
     }
 
+    /* 보드를 세로로 전환 */
     .board-container {
         flex-direction: column;
         overflow-x: hidden;
-        padding: 0 var(--spacing-md) var(--spacing-md) var(--spacing-md);
+        overflow-y: auto;
+        gap: var(--spacing-sm, 0.5rem);
+        padding: var(--spacing-sm, 0.5rem);
     }
 
     .board-column {
-        flex: 1 1 auto;
+        min-width: unset;
+        max-width: unset;
         width: 100%;
+        flex-shrink: 0;
     }
 
+    /* 헤더 조정 */
     .header-content {
         flex-wrap: wrap;
         justify-content: center;
-        padding: var(--spacing-md);
-        gap: var(--spacing-sm);
-    }
-
-    .header-left {
-        flex: 1 1 100%;
-        display: flex;
-        justify-content: center;
+        gap: 0.5rem;
     }
 
     .header-right {
@@ -77,14 +80,40 @@
     }
 }
 
-@media (max-width: 767.98px) {
+/* ─────────────────────────────
+   2. Fold 5 펼쳤을 때 (600px ~ 767px)
+   보드를 2열 그리드로 표시
+   ───────────────────────────── */
+@media (min-width: 600px) and (max-width: 767.98px) {
+    .board-container {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr;
+        gap: var(--spacing-sm, 0.5rem);
+        padding: var(--spacing-sm, 0.5rem);
+    }
+
+    .board-column {
+        width: 100%;
+        min-height: 200px;
+    }
+
+    .column-header {
+        font-size: 0.85rem;
+    }
+
+    .main-header .header-content {
+        flex-direction: column;
+        align-items: center;
+        padding: 0.5rem;
+    }
+
     .header-stats {
-        padding: var(--spacing-sm) 0.75rem;
-        gap: 0.75rem;
+        padding: 0.3rem 0.6rem;
+        gap: 0.5rem;
     }
 
     .stat-number {
-        font-size: 1.1rem;
+        font-size: 1rem;
     }
 
     .stat-label {
@@ -92,19 +121,200 @@
     }
 
     .app-title {
-        font-size: 1.25rem;
+        font-size: 1.1rem;
     }
 
     .logo-icon {
-        width: 36px;
-        height: 36px;
+        width: 32px;
+        height: 32px;
     }
 
-    .logo-icon i {
-        font-size: 16px;
+    .logo-icon span {
+        font-size: 14px !important;
     }
 
+    .task-node-self {
+        padding: 0.4rem 0.5rem;
+        font-size: 0.85rem;
+    }
+
+    .add-task-btn {
+        font-size: 0.8rem;
+        padding: 0.3rem;
+    }
+}
+
+/* ─────────────────────────────
+   3. 소형 모바일 & Fold 5 접었을 때 (≤599px)
+   보드를 1열, 모든 요소 컴팩트
+   ───────────────────────────── */
+@media (max-width: 599.98px) {
+    .board-container {
+        flex-direction: column;
+        gap: 0.25rem;
+        padding: 0.25rem;
+    }
+
+    .board-column {
+        width: 100%;
+    }
+
+    .column-header {
+        font-size: 0.8rem;
+        padding: 0.3rem 0.5rem;
+    }
+
+    .main-header {
+        padding: 0.25rem;
+    }
+
+    .header-content {
+        flex-direction: column;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.25rem;
+    }
+
+    .header-left {
+        display: flex;
+        justify-content: center;
+    }
+
+    .app-title {
+        font-size: 1rem;
+    }
+
+    .app-subtitle {
+        display: none;
+    }
+
+    .logo-icon {
+        width: 28px;
+        height: 28px;
+    }
+
+    .logo-icon span {
+        font-size: 12px !important;
+    }
+
+    .header-stats {
+        padding: 0.25rem 0.5rem;
+        gap: 0.3rem;
+        border-radius: 8px;
+    }
+
+    .stat-number {
+        font-size: 0.95rem;
+    }
+
+    .stat-label {
+        font-size: 0.55rem;
+    }
+
+    .stat-divider {
+        height: 20px;
+    }
+
+    /* 태스크 노드 컴팩트 */
+    .task-node-self {
+        padding: 0.35rem 0.4rem;
+        font-size: 0.8rem;
+        gap: 0.25rem;
+    }
+
+    .task-node-self .task-title {
+        font-size: 0.8rem;
+    }
+
+    .task-node-self .task-actions button {
+        padding: 0.15rem 0.25rem;
+        font-size: 0.7rem;
+    }
+
+    .task-node-children {
+        margin-left: 0.75rem;
+    }
+
+    .add-task-btn {
+        font-size: 0.75rem;
+        padding: 0.25rem;
+    }
+
+    .quick-add-container input {
+        font-size: 0.85rem;
+        padding: 0.3rem 0.5rem;
+    }
+
+    /* 모바일 헤더 */
+    .mobile-header {
+        padding: 0.35rem 0.75rem;
+    }
+
+    .mobile-header-title {
+        font-size: 0.95rem;
+    }
+
+    /* 리스트 뷰 */
+    .list-view-container {
+        padding: 0.25rem;
+    }
+
+    /* 벌크 액션 바 */
+    .bulk-action-bar {
+        font-size: 0.8rem;
+        padding: 0.4rem 0.6rem;
+    }
+
+    /* 모달 */
+    .modal-container {
+        width: 95vw;
+        max-height: 85vh;
+        margin: 0.5rem;
+    }
+
+    /* 날짜 그리드 */
     .date-group {
         grid-template-columns: 1fr;
+    }
+}
+
+/* ─────────────────────────────
+   4. 극소형 화면 (≤350px) – Fold 접은 상태 최소화
+   ───────────────────────────── */
+@media (max-width: 350px) {
+    .header-stats {
+        transform: scale(0.9);
+    }
+
+    .stat-item-link,
+    .stat-item {
+        padding: 0;
+    }
+
+    .column-header {
+        font-size: 0.75rem;
+    }
+
+    .task-node-self {
+        padding: 0.25rem 0.3rem;
+        font-size: 0.75rem;
+    }
+
+    .task-node-children {
+        margin-left: 0.5rem;
+    }
+
+    .board-column {
+        margin-bottom: 0.25rem;
+    }
+}
+
+/* ─────────────────────────────
+   5. 접근성: 모션 줄이기
+   ───────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    .sidebar,
+    .sidebar-overlay {
+        transition: none;
     }
 }
