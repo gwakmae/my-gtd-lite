@@ -1,7 +1,7 @@
 /* 드래그 소스 */
 .task-node-self.is-dragging-source {
-    opacity: 0.4;
-    transform: scale(0.98);
+    opacity: 0.3;
+    transform: scale(0.97);
 }
 
 /* ── 형제(위) - 파란 선 ── */
@@ -42,7 +42,7 @@
     z-index: 10;
 }
 
-/* ── 자식 모드 (홀드 0.8초 후) - 점선 + 라벨 ── */
+/* ── 자식 모드 (홀드 0.8초 후) ── */
 .task-node-self.drop-inside {
     position: relative;
     background-color: rgba(59, 130, 246, 0.08) !important;
@@ -108,15 +108,24 @@
     line-height: 28px;
 }
 
-/* ── 모바일 터치 드래그 고스트 ── */
+/* ── 모바일 터치 고스트 ── */
 .touch-drag-ghost {
     position: fixed !important;
     z-index: 9999 !important;
     pointer-events: none !important;
-    opacity: 0.85;
-    transform: rotate(2deg) scale(1.03);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    opacity: 0.8;
+    /* ★ 기울기 제거, 원본과 동일한 형태 */
+    transform: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     border-radius: 6px;
     background: white;
     transition: none !important;
+}
+
+/* ── 모바일 터치 시 브라우저 기본 동작 방지 ── */
+.task-node-self {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: auto;
 }
