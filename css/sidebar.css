@@ -6,7 +6,8 @@
     overflow-y: auto;
 }
 
-.sidebar-backdrop {
+/* 사이드바 오버레이 (ID와 클래스 통일) */
+.sidebar-overlay {
     display: none;
 }
 
@@ -64,6 +65,7 @@
     font-size: 0.9rem;
 }
 
+/* 모바일 헤더 (기본 숨김, responsive.css에서 표시) */
 .mobile-header {
     display: none;
 }
@@ -79,11 +81,20 @@
     cursor: pointer;
 }
 
-.icon-hamburger {
-    font-size: 1.5rem;
-}
-
 .mobile-header-title {
     font-size: 1.1rem;
     font-weight: 600;
+}
+
+/* 사이드바 안쪽 닫기 버튼용 모바일 헤더 */
+.sidebar .mobile-header {
+    color: white;
+}
+
+.sidebar .mobile-header .sidebar-toggle-btn {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.sidebar .mobile-header .mobile-header-title {
+    color: white;
 }
