@@ -104,7 +104,7 @@ class TaskNodeRenderer {
 
         selfEl.appendChild(card);
 
-        // Add child button
+        // Add child button (자식 추가는 이 버튼으로만)
         var addBtn = document.createElement('button');
         addBtn.className = 'action-btn add-btn';
         addBtn.textContent = '+';
@@ -120,7 +120,7 @@ class TaskNodeRenderer {
             self.cb.onTaskClick(task.Id, e);
         });
 
-        // Drag events
+        // ── Drag events ──
         selfEl.addEventListener('dragstart', function(e) {
             e.dataTransfer.effectAllowed = 'move';
             e.dataTransfer.setData('text/plain', String(task.Id));
@@ -135,7 +135,7 @@ class TaskNodeRenderer {
             self._handleDragOver(selfEl, task, e);
         });
         selfEl.addEventListener('dragleave', function() {
-            selfEl.classList.remove('drop-above', 'drop-inside', 'drop-below', 'drop-invalid');
+            selfEl.classList.remove('drop-above', 'drop-below', 'drop-invalid');
         });
         selfEl.addEventListener('drop', function(e) {
             e.preventDefault();
@@ -165,43 +165,48 @@ class TaskNodeRenderer {
         return nodeEl;
     }
 
+    // ★ 핵심 변경: 2등분만 — Above 또는 Below (Inside 없음)
     _handleDragOver(selfEl, task, e) {
         var draggedId = this.cb.getDraggedId();
         if (!draggedId || draggedId === task.Id) {
+            selfEl.classList.remove('drop-above', 'drop-below');
             selfEl.classList.add('drop-invalid');
             return;
         }
         if (this._isDescendant(task.Id, draggedId)) {
+            selfEl.classList.remove('drop-above', 'drop-below');
             selfEl.classList.add('drop-invalid');
             return;
         }
 
-        selfEl.classList.remove('drop-above', 'drop-inside', 'drop-below', 'drop-invalid');
+        selfEl.classList.remove('drop-above', 'drop-below', 'drop-invalid');
 
         var rect = selfEl.getBoundingClientRect();
         var offsetY = e.clientY - rect.top;
         var height = rect.height;
 
-        // 모바일 친화적 비율: 위 40% = 형제(위), 가운데 20% = 자식, 아래 40% = 형제(아래)
-        if (offsetY < height * 0.4) {
+        // 상위 50% = Above (형제, 위에 삽입)
+        // 하위 50% = Below (형제, 아래에 삽입)
+        if (offsetY < height * 0.5) {
             selfEl.classList.add('drop-above');
-        } else if (offsetY > height * 0.6) {
-            selfEl.classList.add('drop-below');
         } else {
-            selfEl.classList.add('drop-inside');
+            selfEl.classList.add('drop-below');
         }
     }
 
+    // ★ 핵심 변경: Inside 판정 제거 — 항상 형제 이동만
     _handleDrop(selfEl, targetTask) {
-        var position = 'Inside';
-        if (selfEl.classList.contains('drop-above')) position = 'Above';
-        else if (selfEl.classList.contains('drop-below')) position = 'Below';
-        else if (selfEl.classList.contains('drop-invalid')) {
-            selfEl.classList.remove('drop-above', 'drop-inside', 'drop-below', 'drop-invalid');
+        if (selfEl.classList.contains('drop-invalid')) {
+            selfEl.classList.remove('drop-above', 'drop-below', 'drop-invalid');
             return;
         }
 
-        selfEl.classList.remove('drop-above', 'drop-inside', 'drop-below', 'drop-invalid');
+        var position = 'Below';
+        if (selfEl.classList.contains('drop-above')) {
+            position = 'Above';
+        }
+
+        selfEl.classList.remove('drop-above', 'drop-below', 'drop-invalid');
         this.cb.onDrop(targetTask.Id, position);
     }
 
