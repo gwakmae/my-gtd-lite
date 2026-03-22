@@ -8,16 +8,6 @@
     max-height: 100%;
 }
 
-/* 모바일에서 칼럼 폭 제한 해제 */
-@media (max-width: 1199.98px) {
-    .board-column {
-        flex: none;
-        width: 100%;
-        min-width: unset;
-        max-width: unset;
-    }
-}
-
 .board-column.drag-over {
     background-color: #dcdfe4;
 }
@@ -48,4 +38,14 @@
     overflow-y: auto;
     flex: 1;
     padding-bottom: var(--spacing-sm);
+}
+
+/* 태블릿/모바일: 칼럼 280px 고정 해제 */
+@media (max-width: 1199.98px) {
+    .board-column {
+        flex: 1 1 auto !important;
+        width: 100% !important;
+        min-width: unset !important;
+        max-width: unset !important;
+    }
 }
