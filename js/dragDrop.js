@@ -5,7 +5,7 @@ class DragDropManager {
         this._selectedIds = new Set();
     }
 
-    setSelectedIds(ids) { this._selectedIds = ids; }
+    setSelectedIds(ids) { this._selectedIds = ids || new Set(); }
 
     startDrag(taskId, element) {
         this._draggedId = taskId;
@@ -32,5 +32,10 @@ class DragDropManager {
             return [...this._selectedIds];
         }
         return [this._draggedId];
+    }
+
+    // BoardView에서 호출하는 메서드명 호환을 위한 추가
+    getMovingIds() {
+        return this.getIdsToMove();
     }
 }
