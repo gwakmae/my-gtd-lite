@@ -43,7 +43,6 @@ class BoardView {
             onDrop: function(targetId, position) { self._handleDrop(targetId, position); },
             getDraggedId: function() { return self.dragDrop.getDraggedId(); },
             onRefresh: function() { self.render(); },
-            // ★ 모바일 터치: 칼럼 상단/빈 영역 드롭 콜백 ★
             onDropColumnTop: function(status) {
                 var ids = self.dragDrop.getIdsToMove();
                 if (ids.length > 0 && status) {
@@ -54,7 +53,6 @@ class BoardView {
             onDropColumnEmpty: function(status) {
                 var ids = self.dragDrop.getIdsToMove();
                 if (ids.length > 0 && status) {
-                    // 칼럼 빈 영역 = 맨 아래에 추가
                     var siblings = self.ds.getRawTasks().filter(function(t) {
                         return t.ParentId == null && t.Status === status;
                     });
@@ -70,36 +68,33 @@ class BoardView {
         if (!container) return;
         container.innerHTML = '';
 
-        var wrapper = document.createElement('div');
-        wrapper.className = 'board-container';
-
+        // ★ 헤더를 board-container 밖에 배치 ★
         var header = this._renderHeader();
-        wrapper.appendChild(header);
+        container.appendChild(header);
 
-        var columnsRow = document.createElement('div');
-        columnsRow.className = 'board-columns';
+        // ★ board-container에는 칼럼만 직접 배치 (board-columns 래퍼 없음) ★
+        var boardContainer = document.createElement('div');
+        boardContainer.className = 'board-container';
 
         // Today column
         var todayTasks = this.ds.getTodayTasks();
         var todayCol = this._renderColumn('오늘 할 일', todayTasks, null, true);
         todayCol.classList.add('today-column');
-        columnsRow.appendChild(todayCol);
+        boardContainer.appendChild(todayCol);
 
         // Status columns
         var self = this;
         TaskStatusList.forEach(function(status) {
             var tasks = self.ds.getTasksForStatus(status);
             var col = self._renderColumn(status, tasks, status, false);
-            columnsRow.appendChild(col);
+            boardContainer.appendChild(col);
         });
 
-        wrapper.appendChild(columnsRow);
+        container.appendChild(boardContainer);
 
         // Bulk action bar
         var bulkBar = this._renderBulkBar();
-        if (bulkBar) wrapper.appendChild(bulkBar);
-
-        container.appendChild(wrapper);
+        if (bulkBar) container.appendChild(bulkBar);
 
         this.dragDrop.setSelectedIds(this.selectedIds);
         this.renderedTasks = this._buildRenderedList();
@@ -172,14 +167,14 @@ class BoardView {
         if (hideCompletedBtn) {
             hideCompletedBtn.addEventListener('click', function() {
                 self.hideCompleted = !self.hideCompleted;
-                localStorage.setItem('gtd-hide-completed', self.hideCompleted);
+                localStorage.setItem('gtd-hide-completed', String(self.hideCompleted));
                 self.render();
             });
         }
         if (showHiddenBtn) {
             showHiddenBtn.addEventListener('click', function() {
                 self.showHidden = !self.showHidden;
-                localStorage.setItem('gtd-show-hidden', self.showHidden);
+                localStorage.setItem('gtd-show-hidden', String(self.showHidden));
                 self.render();
             });
         }
@@ -223,7 +218,7 @@ class BoardView {
         var taskList = document.createElement('div');
         taskList.className = 'task-list';
 
-        // ★★★ 칼럼 상단 드롭존 (데스크탑 drag용) ★★★
+        // ★ 칼럼 상단 드롭존 ★
         if (!isTodayColumn && status) {
             var topDropZone = document.createElement('div');
             topDropZone.className = 'column-drop-top';
@@ -249,14 +244,13 @@ class BoardView {
             taskList.appendChild(topDropZone);
         }
 
-        // 칼럼 빈 영역 드롭 (데스크탑 drag용)
+        // ★ 칼럼 빈 영역 드롭 ★
         if (!isTodayColumn && status) {
             taskList.addEventListener('dragover', function(e) {
                 e.preventDefault();
                 taskList.classList.add('drag-over-column');
             });
             taskList.addEventListener('dragleave', function(e) {
-                // taskList 자체를 벗어났을 때만 제거
                 if (!taskList.contains(e.relatedTarget)) {
                     taskList.classList.remove('drag-over-column');
                 }
@@ -264,14 +258,12 @@ class BoardView {
             taskList.addEventListener('drop', function(e) {
                 e.preventDefault();
                 taskList.classList.remove('drag-over-column');
-                // 이미 topDropZone이나 task 위에서 처리되었으면 무시
                 var target = e.target;
                 if (target.closest('.column-drop-top') || target.closest('.task-node-self')) {
                     return;
                 }
                 var ids = self.dragDrop.getIdsToMove();
                 if (ids.length > 0) {
-                    // 칼럼 빈 영역 = 맨 아래에 추가
                     var siblings = self.ds.getRawTasks().filter(function(t) {
                         return t.ParentId == null && t.Status === status;
                     });
@@ -281,8 +273,10 @@ class BoardView {
             });
         }
 
-        var trees = this.ds.buildTree(filteredTasks);
-        trees.forEach(function(task) {
+        // ★ buildTree에 filteredTasks를 넘기지 않고, 이미 트리로 받은 tasks를 사용 ★
+        // getTasksForStatus가 이미 buildTree를 호출해서 트리를 반환하므로
+        // 여기서는 filteredTasks (flat이 아닌 tree roots)를 바로 사용
+        filteredTasks.forEach(function(task) {
             var node = self.nodeRenderer.render(task, {
                 selectedIds: self.selectedIds,
                 hideCompleted: self.hideCompleted,
@@ -415,6 +409,7 @@ class BoardView {
     }
 
     _handleTaskClick(task, e) {
+        var self = this;
         if (e.ctrlKey || e.metaKey) {
             if (this.selectedIds.has(task.Id)) {
                 this.selectedIds.delete(task.Id);
@@ -424,7 +419,8 @@ class BoardView {
             this.isMultiSelectMode = this.selectedIds.size > 0;
         } else if (e.shiftKey && this.lastClickedId !== null) {
             var list = this.renderedTasks;
-            var startIdx = list.findIndex(function(t) { return t.Id === this.lastClickedId; }.bind(this));
+            var lastId = this.lastClickedId;
+            var startIdx = list.findIndex(function(t) { return t.Id === lastId; });
             var endIdx = list.findIndex(function(t) { return t.Id === task.Id; });
             if (startIdx !== -1 && endIdx !== -1) {
                 var from = Math.min(startIdx, endIdx);
@@ -468,7 +464,6 @@ class BoardView {
         });
     }
 
-    // ★ _handleDrop: position 문자열을 dataService._resolveDropLocation이 처리 ★
     _handleDrop(targetId, position) {
         var movingIds = this.dragDrop.getIdsToMove();
         if (movingIds.length === 0) return;
@@ -476,8 +471,6 @@ class BoardView {
         var targetTask = this.ds.getById(targetId);
         if (!targetTask) return;
 
-        // dataService.moveTasks가 _resolveDropLocation을 통해
-        // targetId를 기준으로 Above/Below/Inside를 올바르게 해석
         this.ds.moveTasks(movingIds, targetTask.Status, targetId, position);
         this.dragDrop.endDrag();
     }
@@ -542,9 +535,8 @@ class BoardView {
         var all = [];
         var self = this;
         TaskStatusList.forEach(function(status) {
-            var tasks = self.ds.getTasksForStatus(status);
-            var filtered = self._filterTasks(tasks);
-            var trees = self.ds.buildTree(filtered);
+            var trees = self.ds.getTasksForStatus(status);
+            var filtered = self._filterTasks(trees);
             var flatten = function(list) {
                 list.forEach(function(t) {
                     all.push(t);
@@ -553,7 +545,7 @@ class BoardView {
                     }
                 });
             };
-            flatten(trees);
+            flatten(filtered);
         });
         return all;
     }
@@ -589,11 +581,9 @@ class BoardView {
         var reader = new FileReader();
         reader.onload = function(evt) {
             try {
-                var result = self.ds.importFromJson(evt.target.result);
-                if (result && result.success) {
-                    self.toast.success('Imported ' + result.count + ' tasks');
-                    self.render();
-                }
+                self.ds.importFromJson(evt.target.result);
+                self.toast.success('데이터를 가져왔습니다');
+                self.render();
             } catch (err) {
                 self.toast.error('Import failed: ' + err.message);
             }
