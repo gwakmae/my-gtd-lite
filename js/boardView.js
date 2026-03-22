@@ -6,290 +6,237 @@ class BoardView {
         this.dragDrop = new DragDropManager();
         this.modal = new TaskModal(dataService);
         this.bulkPanel = new BulkEditPanel();
-
         this.selectedIds = new Set();
         this.isMultiSelectMode = false;
         this.lastClickedId = null;
         this.renderedTasks = [];
-
         this.hideCompleted = localStorage.getItem('gtd-hide-completed') === 'true';
         this.showHidden = localStorage.getItem('gtd-show-hidden') === 'true';
-
-        var self = this;
         this.nodeRenderer = new TaskNodeRenderer(dataService, {
-            onTaskClick: function(id, e) { self._handleTaskClick(id, e); },
-            onDoubleClick: function(id) { self._openModal(id); },
-            onToggleComplete: function(id) { self.ds.toggleComplete(id); },
-            onDelete: function(id) { self._deleteTask(id); },
-            onAddChild: function(id, nodeEl) { self._showChildQuickAdd(id, nodeEl); },
-            onDragStart: function(id, el) {
-                self.dragDrop.setSelectedIds(self.selectedIds);
-                self.dragDrop.startDrag(id, el);
+            onTaskClick: (taskId, e) => {
+                const task = this.ds.getById(taskId);
+                if (task) this._handleTaskClick(task, e);
             },
-            onDragEnd: function() { self.dragDrop.endDrag(); },
-            onDrop: function(targetId, position) { self._handleDrop(targetId, position); },
-            getDraggedId: function() { return self.dragDrop.getDraggedId(); },
-            onRefresh: function() { self.render(); },
-            // ★ 새 콜백: 칼럼 상단 드롭
-            onDropColumnTop: function(status) {
-                var ids = self.dragDrop.getIdsToMove();
-                if (ids.length > 0) {
-                    self.ds.moveTasks(ids, status, null, 0);
-                }
-                self.dragDrop.endDrag();
+            onDoubleClick: (taskId) => {
+                const task = this.ds.getById(taskId);
+                if (task) this._openModal(task);
             },
-            // ★ 새 콜백: 칼럼 빈 영역 드롭
-            onDropColumnEmpty: function(status) {
-                var ids = self.dragDrop.getIdsToMove();
-                if (ids.length > 0) {
-                    var siblings = self.ds.getTasksForStatus(status);
-                    self.ds.moveTasks(ids, status, null, siblings.length);
-                }
-                self.dragDrop.endDrag();
-            }
+            onToggleComplete: (taskId) => {
+                this.ds.toggleComplete(taskId);
+            },
+            onDelete: (taskId) => {
+                const task = this.ds.getById(taskId);
+                if (task) this._deleteTask(task);
+            },
+            onAddChild: (taskId) => {
+                const task = this.ds.getById(taskId);
+                if (task) this._showChildQuickAdd(task);
+            },
+            onDragStart: (taskId, el) => {
+                this.dragDrop.setSelectedIds(this.selectedIds);
+                this.dragDrop.startDrag(taskId, el);
+            },
+            onDragEnd: () => this.dragDrop.endDrag(),
+            onDrop: (targetId, position) => this._handleDrop(targetId, position),
+            getDraggedId: () => this.dragDrop.getDraggedId(),
+            onRefresh: () => this.render()
         });
     }
 
-    // ── 이하 모든 메서드 기존과 동일 ──
-
     render() {
-        var container = document.getElementById('content-area');
+        const container = document.getElementById('content-area');
         if (!container) return;
         container.innerHTML = '';
 
-        var home = document.createElement('div');
-        home.className = 'home-container';
+        const wrapper = document.createElement('div');
+        wrapper.className = 'board-container';
 
-        home.appendChild(this._renderHeader());
+        const header = this._renderHeader();
+        wrapper.appendChild(header);
 
-        var board = document.createElement('div');
-        board.className = 'board-container';
+        const columnsRow = document.createElement('div');
+        columnsRow.className = 'board-columns';
 
-        var todayTasks = this.ds.getTodayTasks();
-        var todayCol = this._renderColumn('오늘 할 일', todayTasks, null, true);
+        // Today column
+        const todayTasks = this.ds.getTodayTasks();
+        const todayCol = this._renderColumn('오늘 할 일', todayTasks, null, true);
         todayCol.classList.add('today-column');
-        board.appendChild(todayCol);
+        columnsRow.appendChild(todayCol);
 
-        for (var s = 0; s < TaskStatusList.length; s++) {
-            var status = TaskStatusList[s];
-            var tasks = this.ds.getTasksForStatus(status);
-            var col = this._renderColumn(status, tasks, status, false);
-            board.appendChild(col);
-        }
+        // Status columns
+        TaskStatusList.forEach(status => {
+            const tasks = this.ds.getTasksForStatus(status);
+            const col = this._renderColumn(status, tasks, status, false);
+            columnsRow.appendChild(col);
+        });
 
-        home.appendChild(board);
+        wrapper.appendChild(columnsRow);
 
-        var bulkBar = this._renderBulkBar();
-        if (bulkBar) home.appendChild(bulkBar);
+        // Bulk action bar
+        const bulkBar = this._renderBulkBar();
+        if (bulkBar) wrapper.appendChild(bulkBar);
 
-        container.appendChild(home);
+        container.appendChild(wrapper);
 
         this.dragDrop.setSelectedIds(this.selectedIds);
         this.renderedTasks = this._buildRenderedList();
     }
 
     _renderHeader() {
-        var header = document.createElement('div');
-        header.className = 'main-header modern-header';
+        const header = document.createElement('div');
+        header.className = 'board-header';
 
-        var activeTasks = this.ds.getActiveTasks(this.showHidden);
-        var todayTasks = this.ds.getTodayTasks();
-        var focusTasks = this.ds.getFocusTasks();
+        const stats = document.createElement('div');
+        stats.className = 'header-stats';
 
-        header.innerHTML =
-            '<div class="header-content">' +
-                '<div class="header-left">' +
-                    '<div class="app-logo">' +
-                        '<div class="logo-icon"><span style="font-size:20px;color:white;">▦</span></div>' +
-                        '<div class="logo-text">' +
-                            '<h1 class="app-title">GTD Board</h1>' +
-                            '<span class="app-subtitle">Getting Things Done</span>' +
-                        '</div>' +
-                    '</div>' +
-                '</div>' +
-                '<div class="header-center">' +
-                    '<div class="header-stats">' +
-                        '<a class="stat-item-link" data-nav="active">' +
-                            '<div class="stat-item">' +
-                                '<span class="stat-number">' + activeTasks.length + '</span>' +
-                                '<span class="stat-label">Active</span>' +
-                            '</div>' +
-                        '</a>' +
-                        '<div class="stat-divider"></div>' +
-                        '<div class="stat-item">' +
-                            '<span class="stat-number">' + todayTasks.length + '</span>' +
-                            '<span class="stat-label">Today</span>' +
-                        '</div>' +
-                        '<div class="stat-divider"></div>' +
-                        '<a class="stat-item-link" data-nav="focus">' +
-                            '<div class="stat-item">' +
-                                '<span class="stat-number">' + focusTasks.length + '</span>' +
-                                '<span class="stat-label">Focus</span>' +
-                            '</div>' +
-                        '</a>' +
-                    '</div>' +
-                '</div>' +
-                '<div class="header-right">' +
-                    '<div class="data-manager-btns">' +
-                        '<button class="btn-modern" id="btn-export" title="Export">' +
-                            '<span>↓</span><span class="btn-text"> Export</span>' +
-                        '</button>' +
-                        '<button class="btn-modern" id="btn-import" title="Import">' +
-                            '<span>↑</span><span class="btn-text"> Import</span>' +
-                        '</button>' +
-                        '<input type="file" id="file-import" accept=".json" class="file-input-hidden" />' +
-                    '</div>' +
-                    '<button class="btn-modern" id="btn-undo" title="Undo" ' + (this.undo.canUndo() ? '' : 'disabled') + '>' +
-                        '<span>↶</span>' +
-                    '</button>' +
-                    '<button class="btn-modern" id="btn-hide-completed">' +
-                        '<span>' + (this.hideCompleted ? '👁' : '🙈') + '</span>' +
-                        '<span class="btn-text"> ' + (this.hideCompleted ? 'Show' : 'Hide') + '</span>' +
-                    '</button>' +
-                '</div>' +
-            '</div>';
+        const activeTasks = this.ds.getActiveTasks();
+        const todayTasks = this.ds.getTodayTasks();
+        const focusTasks = this.ds.getFocusTasks();
 
-        var self = this;
-        setTimeout(function() {
-            var exportBtn = document.getElementById('btn-export');
-            if (exportBtn) exportBtn.addEventListener('click', function() { self._exportData(); });
+        stats.innerHTML = `
+            <div class="stat-item">
+                <span class="stat-label">Active</span>
+                <span class="stat-value">${activeTasks.length}</span>
+            </div>
+            <span class="stat-separator">|</span>
+            <div class="stat-item">
+                <span class="stat-label">Today</span>
+                <span class="stat-value">${todayTasks.length}</span>
+            </div>
+            <span class="stat-separator">|</span>
+            <div class="stat-item">
+                <span class="stat-label">Focus</span>
+                <span class="stat-value">${focusTasks.length}</span>
+            </div>
+        `;
 
-            var importBtn = document.getElementById('btn-import');
-            if (importBtn) importBtn.addEventListener('click', function() {
-                var f = document.getElementById('file-import');
-                if (f) f.click();
-            });
+        const actions = document.createElement('div');
+        actions.className = 'header-actions';
+        actions.innerHTML = `
+            <button class="btn-modern" id="btn-export" title="Export">📥 Export</button>
+            <button class="btn-modern" id="btn-import" title="Import">📤 Import</button>
+            <input type="file" id="import-file" accept=".json" style="display:none">
+            <button class="btn-modern" id="btn-undo" title="Undo (Ctrl+Z)" disabled>↩️ Undo</button>
+            <button class="btn-modern" id="btn-hide-completed">${this.hideCompleted ? '👁️ Show Completed' : '🙈 Hide Completed'}</button>
+            <button class="btn-modern" id="btn-show-hidden" style="display:${this.showHidden ? 'inline-flex' : 'none'}">${this.showHidden ? '👻 Hide Hidden' : '👻 Show Hidden'}</button>
+        `;
 
-            var fileInput = document.getElementById('file-import');
-            if (fileInput) fileInput.addEventListener('change', function(e) { self._importData(e); });
+        header.appendChild(stats);
+        header.appendChild(actions);
 
-            var undoBtn = document.getElementById('btn-undo');
-            if (undoBtn) undoBtn.addEventListener('click', function() { self.undo.undoLatest(); });
-
-            var hideBtn = document.getElementById('btn-hide-completed');
-            if (hideBtn) hideBtn.addEventListener('click', function() {
-                self.hideCompleted = !self.hideCompleted;
-                localStorage.setItem('gtd-hide-completed', String(self.hideCompleted));
-                self.render();
-            });
-
-            document.querySelectorAll('[data-nav]').forEach(function(el) {
-                el.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    if (window.app) window.app.navigate(el.dataset.nav);
-                });
-            });
-        }, 0);
+        this._wireHeaderEvents(actions);
 
         return header;
     }
 
-    _renderColumn(title, tasks, status, isTodayCol) {
-        var col = document.createElement('div');
+    _wireHeaderEvents(actions) {
+        const self = this;
+        const exportBtn = actions.querySelector('#btn-export');
+        const importBtn = actions.querySelector('#btn-import');
+        const importFile = actions.querySelector('#import-file');
+        const undoBtn = actions.querySelector('#btn-undo');
+        const hideCompletedBtn = actions.querySelector('#btn-hide-completed');
+        const showHiddenBtn = actions.querySelector('#btn-show-hidden');
+
+        if (exportBtn) exportBtn.addEventListener('click', () => self._exportData());
+        if (importBtn) importBtn.addEventListener('click', () => importFile.click());
+        if (importFile) importFile.addEventListener('change', (e) => self._importData(e));
+        if (undoBtn) {
+            if (self.undo.canUndo) undoBtn.disabled = false;
+            undoBtn.addEventListener('click', async () => {
+                await self.undo.undoLatest();
+                self.render();
+            });
+        }
+        if (hideCompletedBtn) {
+            hideCompletedBtn.addEventListener('click', () => {
+                self.hideCompleted = !self.hideCompleted;
+                localStorage.setItem('gtd-hide-completed', self.hideCompleted);
+                self.render();
+            });
+        }
+        if (showHiddenBtn) {
+            showHiddenBtn.addEventListener('click', () => {
+                self.showHidden = !self.showHidden;
+                localStorage.setItem('gtd-show-hidden', self.showHidden);
+                self.render();
+            });
+        }
+    }
+
+    _renderColumn(title, tasks, status, isTodayColumn) {
+        const col = document.createElement('div');
         col.className = 'board-column';
         if (status) col.dataset.status = status;
 
-        var filteredTasks = this._filterTasks(tasks);
+        const colHeader = document.createElement('div');
+        colHeader.className = 'column-header';
+
+        const filteredTasks = this._filterTasks(tasks);
+
+        const titleEl = document.createElement('h3');
+        titleEl.textContent = title + ' (' + filteredTasks.length + ')';
+        colHeader.appendChild(titleEl);
 
         if (status === TaskStatus.Completed) {
-            var headerDiv = document.createElement('div');
-            headerDiv.className = 'column-header-with-action';
-            var h3 = document.createElement('h3');
-            h3.className = 'column-header';
-            h3.textContent = title + ' (' + filteredTasks.length + ')';
-            headerDiv.appendChild(h3);
-            var clearBtn = document.createElement('button');
+            const clearBtn = document.createElement('button');
             clearBtn.className = 'btn-clear-completed';
-            clearBtn.textContent = '🗑';
-            clearBtn.title = 'Clear all completed';
-            var self = this;
-            clearBtn.addEventListener('click', function() {
-                if (confirm('완료된 모든 항목을 삭제하시겠습니까?')) {
-                    self.ds.deleteAllCompleted();
+            clearBtn.textContent = '🗑️ Clear All';
+            clearBtn.addEventListener('click', () => {
+                if (confirm('완료된 모든 작업을 삭제하시겠습니까?')) {
+                    const completedTasks = this.ds.getTasksForStatus(TaskStatus.Completed);
+                    const snapshot = completedTasks.map(t => t.clone());
+                    this.ds.deleteAllCompleted();
+                    this.undo.push({
+                        desc: `Deleted ${snapshot.length} completed tasks`,
+                        undo: () => this.ds.restoreTasks(snapshot)
+                    });
                 }
             });
-            headerDiv.appendChild(clearBtn);
-            col.appendChild(headerDiv);
-        } else {
-            var h3 = document.createElement('h3');
-            h3.className = 'column-header';
-            h3.textContent = title + ' (' + filteredTasks.length + ')';
-            col.appendChild(h3);
+            colHeader.appendChild(clearBtn);
         }
 
-        var taskList = document.createElement('div');
+        col.appendChild(colHeader);
+
+        const taskList = document.createElement('div');
         taskList.className = 'task-list';
-        var topDropHandled = false;
 
-        if (status && !isTodayCol && filteredTasks.length > 0) {
-            var self = this;
-            var dropTop = document.createElement('div');
-            dropTop.className = 'column-drop-top';
-            dropTop.addEventListener('dragover', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                dropTop.classList.add('drag-over-top');
-            });
-            dropTop.addEventListener('dragleave', function() {
-                dropTop.classList.remove('drag-over-top');
-            });
-            dropTop.addEventListener('drop', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                dropTop.classList.remove('drag-over-top');
-                var ids = self.dragDrop.getIdsToMove();
-                if (ids.length > 0) {
-                    self.ds.moveTasks(ids, status, null, 0);
-                }
-                self.dragDrop.endDrag();
-                topDropHandled = true;
-            });
-            taskList.appendChild(dropTop);
-        }
-
-        for (var i = 0; i < filteredTasks.length; i++) {
-            var node = this.nodeRenderer.render(filteredTasks[i], {
-                hideCompleted: this.hideCompleted,
-                showHidden: this.showHidden,
-                selectedIds: this.selectedIds,
-                isMultiSelectMode: this.isMultiSelectMode
-            });
-            if (node) taskList.appendChild(node);
-        }
-
-        col.appendChild(taskList);
-
-        if (status && !isTodayCol) {
-            var self = this;
-            taskList.addEventListener('dragover', function(e) {
+        if (!isTodayColumn) {
+            taskList.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 taskList.classList.add('drag-over-column');
             });
-            taskList.addEventListener('dragleave', function() {
+            taskList.addEventListener('dragleave', () => {
                 taskList.classList.remove('drag-over-column');
             });
-            taskList.addEventListener('drop', function(e) {
-                if (topDropHandled) {
-                    topDropHandled = false;
-                    return;
-                }
+            taskList.addEventListener('drop', (e) => {
                 e.preventDefault();
                 taskList.classList.remove('drag-over-column');
-                var ids = self.dragDrop.getIdsToMove();
-                if (ids.length > 0) {
-                    var siblings = self.ds.getTasksForStatus(status);
-                    self.ds.moveTasks(ids, status, null, siblings.length);
+                const draggedIds = this.dragDrop.getMovingIds();
+                if (draggedIds.length > 0 && status) {
+                    this.ds.moveTasks(draggedIds, status, null, 'Inside');
                 }
-                self.dragDrop.endDrag();
+                this.dragDrop.endDrag();
             });
         }
 
-        if (status && status !== TaskStatus.Completed && !isTodayCol) {
-            var self = this;
-            var addBtn = document.createElement('button');
+        const trees = this.ds.buildTree(filteredTasks);
+        trees.forEach(task => {
+            const node = this.nodeRenderer.render(task, {
+                selectedIds: this.selectedIds,
+                hideCompleted: this.hideCompleted,
+                showHidden: this.showHidden
+            });
+            if (node) taskList.appendChild(node);
+        });
+
+        col.appendChild(taskList);
+
+        if (status && status !== TaskStatus.Completed && !isTodayColumn) {
+            const addBtn = document.createElement('button');
             addBtn.className = 'add-task-btn';
             addBtn.textContent = '+ Add Task';
-            addBtn.addEventListener('click', function() { self._showQuickAdd(col, status, addBtn); });
+            addBtn.addEventListener('click', () => this._showQuickAdd(col, status, addBtn));
             col.appendChild(addBtn);
         }
 
@@ -297,10 +244,9 @@ class BoardView {
     }
 
     _filterTasks(tasks) {
-        var self = this;
-        return tasks.filter(function(t) {
-            if (self.hideCompleted && t.IsCompleted) return false;
-            if (!self.showHidden && t.IsHidden) return false;
+        return tasks.filter(t => {
+            if (this.hideCompleted && t.IsCompleted) return false;
+            if (!this.showHidden && t.IsHidden) return false;
             return true;
         });
     }
@@ -311,15 +257,18 @@ class BoardView {
 
         var container = document.createElement('div');
         container.className = 'quick-add-container';
+
         var input = document.createElement('input');
         input.type = 'text';
+        input.className = 'quick-add-input';
         input.placeholder = 'New task title...';
         container.appendChild(input);
         column.appendChild(container);
         input.focus();
 
         var done = false;
-        input.addEventListener('keydown', function(e) {
+
+        input.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 if (input.value.trim() && !done) {
@@ -334,8 +283,9 @@ class BoardView {
                 input.blur();
             }
         });
-        input.addEventListener('blur', function() {
-            setTimeout(function() {
+
+        input.addEventListener('blur', function () {
+            setTimeout(function () {
                 if (!done && input.value.trim()) {
                     self.ds.addTask(input.value.trim(), status, null);
                 }
@@ -345,35 +295,37 @@ class BoardView {
         });
     }
 
-    _showChildQuickAdd(parentId, nodeEl) {
+    _showChildQuickAdd(parent) {
         var self = this;
-        var parent = this.ds.getById(parentId);
-        if (!parent) return;
+        var parentId = parent.Id;
+        var parentEl = document.querySelector('[data-task-id="' + parentId + '"]');
+        if (!parentEl) return;
 
-        if (!parent.IsExpanded) {
-            this.ds.updateExpandState(parentId, true);
-            this.render();
-            return;
-        }
-
-        var childrenEl = nodeEl.querySelector('.task-node-children');
-        if (!childrenEl) {
-            childrenEl = document.createElement('div');
-            childrenEl.className = 'task-node-children';
-            nodeEl.appendChild(childrenEl);
+        var childrenContainer = parentEl.querySelector('.task-node-children');
+        if (!childrenContainer) {
+            childrenContainer = document.createElement('div');
+            childrenContainer.className = 'task-node-children';
+            parentEl.appendChild(childrenContainer);
         }
 
         var container = document.createElement('div');
-        container.className = 'quick-add-container child-add';
+        container.className = 'quick-add-container';
+
         var input = document.createElement('input');
         input.type = 'text';
+        input.className = 'quick-add-input';
         input.placeholder = 'New subtask...';
         container.appendChild(input);
-        childrenEl.appendChild(container);
+        childrenContainer.appendChild(container);
         input.focus();
 
+        if (!parent.IsExpanded) {
+            this.ds.updateExpandState(parentId, true);
+        }
+
         var done = false;
-        input.addEventListener('keydown', function(e) {
+
+        input.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 if (input.value.trim() && !done) {
@@ -388,8 +340,9 @@ class BoardView {
                 input.blur();
             }
         });
-        input.addEventListener('blur', function() {
-            setTimeout(function() {
+
+        input.addEventListener('blur', function () {
+            setTimeout(function () {
                 if (!done && input.value.trim()) {
                     self.ds.addTask(input.value.trim(), parent.Status, parentId);
                 }
@@ -398,161 +351,143 @@ class BoardView {
         });
     }
 
-    _handleTaskClick(taskId, e) {
+    _handleTaskClick(task, e) {
         if (e.ctrlKey || e.metaKey) {
-            if (this.selectedIds.has(taskId)) this.selectedIds.delete(taskId);
-            else this.selectedIds.add(taskId);
+            if (this.selectedIds.has(task.Id)) {
+                this.selectedIds.delete(task.Id);
+            } else {
+                this.selectedIds.add(task.Id);
+            }
             this.isMultiSelectMode = this.selectedIds.size > 0;
         } else if (e.shiftKey && this.lastClickedId !== null) {
-            var list = this.renderedTasks;
-            var self = this;
-            var startIdx = list.findIndex(function(t) { return t.Id === self.lastClickedId; });
-            var endIdx = list.findIndex(function(t) { return t.Id === taskId; });
+            const list = this.renderedTasks;
+            const startIdx = list.findIndex(t => t.Id === this.lastClickedId);
+            const endIdx = list.findIndex(t => t.Id === task.Id);
             if (startIdx !== -1 && endIdx !== -1) {
-                var from = Math.min(startIdx, endIdx);
-                var to = Math.max(startIdx, endIdx);
-                for (var i = from; i <= to; i++) {
+                const from = Math.min(startIdx, endIdx);
+                const to = Math.max(startIdx, endIdx);
+                for (let i = from; i <= to; i++) {
                     this.selectedIds.add(list[i].Id);
                 }
             }
             this.isMultiSelectMode = true;
         } else {
-            if (this.selectedIds.has(taskId) && this.selectedIds.size === 1) {
+            if (this.selectedIds.has(task.Id) && this.selectedIds.size === 1) {
                 this.selectedIds.clear();
                 this.isMultiSelectMode = false;
             } else {
                 this.selectedIds.clear();
-                this.selectedIds.add(taskId);
+                this.selectedIds.add(task.Id);
                 this.isMultiSelectMode = false;
             }
         }
-        this.lastClickedId = taskId;
+        this.lastClickedId = task.Id;
         this.render();
     }
 
-    _openModal(taskId) {
-        var self = this;
-        this.modal.open(taskId, function() { self.render(); });
+    _openModal(task) {
+        this.modal.open(task.Id, () => {
+            this.render();
+        });
     }
 
-    _deleteTask(taskId) {
-        var snapshot = this.ds.deleteTask(taskId);
-        var self = this;
+    _deleteTask(task) {
+        const snapshot = task.clone();
+        const children = this.ds.getAllTasks().filter(t => t.ParentId === task.Id).map(t => t.clone());
+        this.ds.deleteTask(task.Id);
         this.undo.push({
-            description: '작업 삭제됨',
-            undo: function() { self.ds.restoreTasks(snapshot); }
+            desc: `Deleted "${task.Title}"`,
+            undo: () => {
+                this.ds.restoreTasks([snapshot, ...children]);
+            }
         });
     }
 
     _handleDrop(targetId, position) {
-        var ids = this.dragDrop.getIdsToMove();
-        if (ids.length === 0) return;
+        const movingIds = this.dragDrop.getMovingIds();
+        if (movingIds.length === 0) return;
 
-        var target = this.ds.getById(targetId);
-        if (!target) return;
+        const targetTask = this.ds.getById(targetId);
+        if (!targetTask) return;
 
-        var newStatus = target.Status;
-        var newParentId;
-        var newSortOrder;
-
-        if (position === 'Inside') {
-            newParentId = target.Id;
-            var existingChildren = this.ds.getRawTasks().filter(function(t) {
-                return t.ParentId === target.Id;
-            });
-            newSortOrder = existingChildren.length;
-        } else {
-            newParentId = target.ParentId;
-            var siblings = this.ds.getRawTasks().filter(function(t) {
-                return t.ParentId === target.ParentId && t.Status === target.Status;
-            }).sort(function(a, b) { return a.SortOrder - b.SortOrder; });
-
-            var targetIdx = -1;
-            for (var i = 0; i < siblings.length; i++) {
-                if (siblings[i].Id === target.Id) {
-                    targetIdx = i;
-                    break;
-                }
-            }
-
-            if (position === 'Above') {
-                newSortOrder = targetIdx >= 0 ? targetIdx : 0;
-            } else {
-                newSortOrder = targetIdx >= 0 ? targetIdx + 1 : siblings.length;
-            }
-        }
-
-        this.ds.moveTasks(ids, newStatus, newParentId, newSortOrder);
+        this.ds.moveTasks(movingIds, targetTask.Status, targetId, position);
         this.dragDrop.endDrag();
     }
 
     _renderBulkBar() {
         if (this.selectedIds.size < 2) return null;
 
-        var bar = document.createElement('div');
-        bar.className = 'bulk-action-bar visible';
-        bar.innerHTML =
-            '<div class="bar-content">' +
-                '<span class="selection-count">' + this.selectedIds.size + '개 선택됨</span>' +
-                '<div class="actions">' +
-                    '<button id="bulk-edit-btn">✎ 일괄 편집</button>' +
-                    '<button class="danger" id="bulk-delete-btn">🗑 삭제</button>' +
-                '</div>' +
-            '</div>' +
-            '<button class="close-btn" id="bulk-deselect">×</button>';
+        const bar = document.createElement('div');
+        bar.className = 'bulk-action-bar';
+        bar.innerHTML = `
+            <span>${this.selectedIds.size} tasks selected</span>
+            <button class="btn-modern" id="bulk-edit-btn">✏️ Bulk Edit</button>
+            <button class="btn-modern" id="bulk-delete-btn">🗑️ Delete</button>
+            <button class="btn-modern" id="bulk-cancel-btn">✖ Cancel</button>
+        `;
 
-        var self = this;
-        setTimeout(function() {
-            var editBtn = document.getElementById('bulk-edit-btn');
-            if (editBtn) editBtn.addEventListener('click', function() {
-                self.bulkPanel.show(self.selectedIds, function(model) {
+        const self = this;
+
+        bar.querySelector('#bulk-edit-btn').addEventListener('click', () => {
+            this.bulkPanel.show(
+                this.selectedIds,
+                (model) => {
+                    const snapshots = [];
+                    model.taskIds.forEach(id => {
+                        const t = self.ds.getById(id);
+                        if (t) snapshots.push(t.clone());
+                    });
                     self.ds.bulkUpdate(model);
-                    self.selectedIds.clear();
-                    self.render();
-                }, function() {});
-            });
-
-            var delBtn = document.getElementById('bulk-delete-btn');
-            if (delBtn) delBtn.addEventListener('click', function() {
-                if (confirm(self.selectedIds.size + '개의 항목을 삭제하시겠습니까?')) {
-                    var ids = Array.from(self.selectedIds);
-                    var snapshot = self.ds.deleteTasks(ids);
                     self.undo.push({
-                        description: snapshot.length + '개 작업 삭제됨',
-                        undo: function() { self.ds.restoreTasks(snapshot); }
+                        desc: `Bulk edited ${model.taskIds.length} tasks`,
+                        undo: () => self.ds.restoreTasks(snapshots)
                     });
                     self.selectedIds.clear();
-                    self.isMultiSelectMode = false;
-                }
-            });
+                    self.render();
+                },
+                () => { }
+            );
+        });
 
-            var deselectBtn = document.getElementById('bulk-deselect');
-            if (deselectBtn) deselectBtn.addEventListener('click', function() {
-                self.selectedIds.clear();
-                self.isMultiSelectMode = false;
-                self.render();
-            });
-        }, 0);
+        bar.querySelector('#bulk-delete-btn').addEventListener('click', () => {
+            if (confirm(this.selectedIds.size + '개 작업을 삭제하시겠습니까?')) {
+                const ids = Array.from(this.selectedIds);
+                const snapshots = ids.map(id => this.ds.getById(id)).filter(Boolean).map(t => t.clone());
+                this.ds.deleteTasks(ids);
+                this.undo.push({
+                    desc: `Deleted ${ids.length} tasks`,
+                    undo: () => this.ds.restoreTasks(snapshots)
+                });
+                this.selectedIds.clear();
+                this.render();
+            }
+        });
+
+        bar.querySelector('#bulk-cancel-btn').addEventListener('click', () => {
+            this.selectedIds.clear();
+            this.isMultiSelectMode = false;
+            this.render();
+        });
 
         return bar;
     }
 
     _buildRenderedList() {
-        var all = [];
-        var self = this;
-        var flatten = function(list) {
-            for (var i = 0; i < list.length; i++) {
-                all.push(list[i]);
-                if (list[i].Children && list[i].Children.length > 0 && list[i].IsExpanded) {
-                    flatten(list[i].Children);
-                }
-            }
-        };
-        for (var s = 0; s < TaskStatusList.length; s++) {
-            var tasks = self.ds.getTasksForStatus(TaskStatusList[s]);
-            var filtered = self._filterTasks(tasks);
-            flatten(filtered);
-        }
+        const all = [];
+        TaskStatusList.forEach(status => {
+            const tasks = this.ds.getTasksForStatus(status);
+            const filtered = this._filterTasks(tasks);
+            const trees = this.ds.buildTree(filtered);
+            const flatten = (list) => {
+                list.forEach(t => {
+                    all.push(t);
+                    if (t.Children && t.Children.length > 0 && t.IsExpanded) {
+                        flatten(t.Children);
+                    }
+                });
+            };
+            flatten(trees);
+        });
         return all;
     }
 
@@ -566,31 +501,35 @@ class BoardView {
 
     _exportData() {
         try {
-            var json = this.ds.exportToJson();
-            var blob = new Blob([json], { type: 'application/json' });
-            var url = URL.createObjectURL(blob);
-            var a = document.createElement('a');
+            const json = this.ds.exportToJson();
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
             a.href = url;
             a.download = 'gtd-backup-' + new Date().toISOString().slice(0, 10) + '.json';
             a.click();
             URL.revokeObjectURL(url);
-            this.toast.success('데이터를 내보냈습니다.');
+            this.toast.success('Data exported successfully');
         } catch (e) {
-            this.toast.error('Export 실패: ' + e.message);
+            this.toast.error('Export failed: ' + e.message);
         }
     }
 
     _importData(e) {
-        var self = this;
-        var file = e.target.files[0];
+        const file = e.target.files[0];
         if (!file) return;
-        var reader = new FileReader();
-        reader.onload = function(evt) {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
             try {
-                self.ds.importFromJson(evt.target.result);
-                self.toast.success('데이터를 가져왔습니다.');
+                const result = this.ds.importFromJson(evt.target.result);
+                if (result.success) {
+                    this.toast.success('Imported ' + result.count + ' tasks');
+                    this.render();
+                } else {
+                    this.toast.error('Import failed: ' + result.error);
+                }
             } catch (err) {
-                self.toast.error('Import 실패: ' + err.message);
+                this.toast.error('Import failed: ' + err.message);
             }
         };
         reader.readAsText(file);
