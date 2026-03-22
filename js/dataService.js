@@ -413,7 +413,6 @@ class DataService {
         const selectedSet = new Set(taskIds);
 
         // 선택된 항목 중 "루트로 움직일 항목"만 추림
-        // (선택된 부모의 자식은 부모와 함께 이동하므로 제외)
         const rootTasks = this._tasks
             .filter(t => selectedSet.has(t.Id) && (t.ParentId == null || !selectedSet.has(t.ParentId)))
             .sort((a, b) => a.SortOrder - b.SortOrder);
@@ -460,7 +459,6 @@ class DataService {
         for (const key of sourceGroups) {
             const group = this._parseGroupKey(key);
 
-            // 같은 그룹 안에서 재배치된 경우는 destination에서 한 번에 처리
             if (group.parentId === newParentId && group.status === newStatus) {
                 continue;
             }
