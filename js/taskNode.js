@@ -6,8 +6,6 @@ class TaskNodeRenderer {
         this._holdTimer = null;
         this._holdTargetEl = null;
 
-        this._isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-
         this._touchState = {
             startX: 0, startY: 0,
             offsetX: 0, offsetY: 0,
@@ -41,9 +39,8 @@ class TaskNodeRenderer {
         selfEl.className = 'task-node-self';
         selfEl.dataset.taskId = task.Id;
 
-        if (!this._isTouchDevice) {
-            selfEl.draggable = true;
-        }
+        // ★ 항상 draggable (데스크탑 마우스 드래그용) ★
+        selfEl.draggable = true;
 
         if (selectedIds && selectedIds.has(task.Id)) {
             if (isMultiSelectMode || selectedIds.size > 1) {
@@ -132,61 +129,64 @@ class TaskNodeRenderer {
             self.cb.onTaskClick(task.Id, e);
         });
 
-        // 데스크탑 Drag
-        if (!this._isTouchDevice) {
-            selfEl.addEventListener('dragstart', function(e) {
-                e.dataTransfer.effectAllowed = 'move';
-                e.dataTransfer.setData('text/plain', String(task.Id));
+        // ★ 데스크탑 Drag — 항상 등록 ★
+        selfEl.addEventListener('dragstart', function(e) {
+            // 터치 드래그 중이면 HTML5 drag 무시
+            if (self._touchState.isDragging) {
+                e.preventDefault();
+                return;
+            }
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', String(task.Id));
+            self.cb.onDragStart(task.Id, selfEl);
+        });
+        selfEl.addEventListener('dragend', function() {
+            self._clearHoldTimer();
+            self.cb.onDragEnd();
+        });
+        selfEl.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            self._handleDragOver(selfEl, task, e);
+        });
+        selfEl.addEventListener('dragleave', function() {
+            self._clearHoldTimer();
+            selfEl.classList.remove('drop-above', 'drop-below', 'drop-inside', 'drop-invalid');
+        });
+        selfEl.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            self._clearHoldTimer();
+            self._handleDrop(selfEl, task);
+        });
+
+        // ★ 모바일 Touch — 항상 등록 (터치 지원 기기에서만 실제 동작) ★
+        selfEl.addEventListener('touchstart', function(e) {
+            if (e.touches.length !== 1) return;
+            var touch = e.touches[0];
+            var rect = selfEl.getBoundingClientRect();
+            self._touchState.offsetX = touch.clientX - rect.left;
+            self._touchState.offsetY = touch.clientY - rect.top;
+            self._touchState.startX = touch.clientX;
+            self._touchState.startY = touch.clientY;
+            self._touchState.taskId = task.Id;
+            self._touchState.sourceEl = selfEl;
+            self._touchState.isDragging = false;
+
+            self._touchState.longPressTimer = setTimeout(function() {
+                self._touchState.isDragging = true;
+                // draggable을 일시 해제해서 HTML5 drag 충돌 방지
+                selfEl.draggable = false;
+                selfEl.classList.add('is-dragging-source');
                 self.cb.onDragStart(task.Id, selfEl);
-            });
-            selfEl.addEventListener('dragend', function() {
-                self._clearHoldTimer();
-                self.cb.onDragEnd();
-            });
-            selfEl.addEventListener('dragover', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                self._handleDragOver(selfEl, task, e);
-            });
-            selfEl.addEventListener('dragleave', function() {
-                self._clearHoldTimer();
-                selfEl.classList.remove('drop-above', 'drop-below', 'drop-inside', 'drop-invalid');
-            });
-            selfEl.addEventListener('drop', function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                self._clearHoldTimer();
-                self._handleDrop(selfEl, task);
-            });
-        }
+                self._createGhost(selfEl, touch.clientX, touch.clientY);
+                if (navigator.vibrate) navigator.vibrate(30);
+            }, 500);
 
-        // 모바일 Touch
-        if (this._isTouchDevice) {
-            selfEl.addEventListener('touchstart', function(e) {
-                if (e.touches.length !== 1) return;
-                var touch = e.touches[0];
-                var rect = selfEl.getBoundingClientRect();
-                self._touchState.offsetX = touch.clientX - rect.left;
-                self._touchState.offsetY = touch.clientY - rect.top;
-                self._touchState.startX = touch.clientX;
-                self._touchState.startY = touch.clientY;
-                self._touchState.taskId = task.Id;
-                self._touchState.sourceEl = selfEl;
-                self._touchState.isDragging = false;
-
-                self._touchState.longPressTimer = setTimeout(function() {
-                    self._touchState.isDragging = true;
-                    selfEl.classList.add('is-dragging-source');
-                    self.cb.onDragStart(task.Id, selfEl);
-                    self._createGhost(selfEl, touch.clientX, touch.clientY);
-                    if (navigator.vibrate) navigator.vibrate(30);
-                }, 500);
-
-                document.addEventListener('touchmove', self._boundTouchMove, { passive: false });
-                document.addEventListener('touchend', self._boundTouchEnd);
-                selfEl.addEventListener('contextmenu', self._preventContext);
-            }, { passive: true });
-        }
+            document.addEventListener('touchmove', self._boundTouchMove, { passive: false });
+            document.addEventListener('touchend', self._boundTouchEnd);
+            selfEl.addEventListener('contextmenu', self._preventContext);
+        }, { passive: true });
 
         nodeEl.appendChild(selfEl);
 
@@ -320,7 +320,6 @@ class TaskNodeRenderer {
         }
     }
 
-    // ★★★ 핵심 수정: column-top/column-empty를 콜백으로 처리 ★★★
     _onTouchEnd(e) {
         var ts = this._touchState;
         document.removeEventListener('touchmove', this._boundTouchMove);
@@ -329,7 +328,9 @@ class TaskNodeRenderer {
 
         if (!ts.isDragging) { this._cancelTouch(); return; }
 
-        // 고스트 숨기고 최종 위치 재확인
+        // ★ draggable 복원 ★
+        if (ts.sourceEl) ts.sourceEl.draggable = true;
+
         if (ts.ghostEl) ts.ghostEl.style.display = 'none';
         var finalElem = document.elementFromPoint(ts.lastTouchX, ts.lastTouchY);
         if (ts.ghostEl) { ts.ghostEl.remove(); ts.ghostEl = null; }
@@ -338,7 +339,6 @@ class TaskNodeRenderer {
 
         var position = ts.currentDropPosition;
 
-        // 최종 요소로 재확인
         if (finalElem) {
             var finalDropTop = finalElem.closest('.column-drop-top');
             if (finalDropTop) {
@@ -361,7 +361,6 @@ class TaskNodeRenderer {
             }
         }
 
-        // ── column-top: 콜백으로 처리 ──
         if (position === 'column-top') {
             document.querySelectorAll('.drag-over-top').forEach(function(el) { el.classList.remove('drag-over-top'); });
             var colEl = ts.currentDropTarget ? ts.currentDropTarget.closest('.board-column') : null;
@@ -374,7 +373,6 @@ class TaskNodeRenderer {
             return;
         }
 
-        // ── column-empty: 콜백으로 처리 ──
         if (position === 'column-empty') {
             document.querySelectorAll('.drag-over-column').forEach(function(el) { el.classList.remove('drag-over-column'); });
             var colEl = ts.currentDropTarget ? ts.currentDropTarget.closest('.board-column') : null;
@@ -387,7 +385,6 @@ class TaskNodeRenderer {
             return;
         }
 
-        // ── task 위 드롭: 기존 콜백 ──
         if (position === 'Above' || position === 'Below' || position === 'Inside') {
             var targetSelfEl = ts.currentDropTarget ? ts.currentDropTarget.closest('.task-node-self') : null;
             if (targetSelfEl) {
@@ -407,7 +404,10 @@ class TaskNodeRenderer {
     _cancelTouch() {
         var ts = this._touchState;
         if (ts.longPressTimer) { clearTimeout(ts.longPressTimer); ts.longPressTimer = null; }
-        if (ts.sourceEl) ts.sourceEl.removeEventListener('contextmenu', this._preventContext);
+        if (ts.sourceEl) {
+            ts.sourceEl.removeEventListener('contextmenu', this._preventContext);
+            ts.sourceEl.draggable = true; // ★ 복원 ★
+        }
         document.removeEventListener('touchmove', this._boundTouchMove);
         document.removeEventListener('touchend', this._boundTouchEnd);
         this._resetTouchState();
