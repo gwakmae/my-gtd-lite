@@ -183,10 +183,14 @@
     margin-top: var(--spacing-sm);
 }
 
+/* ★★★ 수정: child-add에 왼쪽 보더 + 들여쓰기로 하위 작업임을 명확히 ★★★ */
 .quick-add-container.child-add {
     padding-left: 24px;
+    margin-left: 12px;
     margin-top: 4px;
     margin-bottom: 4px;
+    border-left: 2px solid var(--primary-color, #3b82f6);
+    position: relative;
 }
 
 .quick-add-container input {
