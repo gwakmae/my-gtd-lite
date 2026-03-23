@@ -13,6 +13,9 @@ class BoardView {
         this.hideCompleted = localStorage.getItem('gtd-hide-completed') === 'true';
         this.showHidden = localStorage.getItem('gtd-show-hidden') === 'true';
 
+        // ★ 스크롤 위치 저장용 ★
+        this._savedScrollLeft = 0;
+
         var self = this;
 
         this.nodeRenderer = new TaskNodeRenderer(dataService, {
@@ -66,6 +69,13 @@ class BoardView {
     render() {
         var container = document.getElementById('content-area');
         if (!container) return;
+
+        // ★★★ 스크롤 위치 저장 ★★★
+        var oldBoard = container.querySelector('.board-container');
+        if (oldBoard) {
+            this._savedScrollLeft = oldBoard.scrollLeft;
+        }
+
         container.innerHTML = '';
 
         var header = this._renderHeader();
@@ -87,6 +97,14 @@ class BoardView {
         });
 
         container.appendChild(boardContainer);
+
+        // ★★★ 스크롤 위치 복원 ★★★
+        var savedScroll = this._savedScrollLeft;
+        if (savedScroll > 0) {
+            requestAnimationFrame(function() {
+                boardContainer.scrollLeft = savedScroll;
+            });
+        }
 
         var bulkBar = this._renderBulkBar();
         if (bulkBar) container.appendChild(bulkBar);
@@ -298,15 +316,12 @@ class BoardView {
         });
     }
 
-    // ★★★ 수정: 칼럼 하단 Add Task — task-list 안 맨 아래에 input 표시 ★★★
     _showQuickAdd(column, status, addBtn) {
         var self = this;
         if (addBtn) addBtn.style.display = 'none';
 
-        // task-list 안의 맨 아래에 input을 넣어서 실제 추가될 위치에 보이게 함
         var taskList = column.querySelector('.task-list');
         if (!taskList) {
-            // fallback: task-list가 없으면 column에 직접
             taskList = column;
         }
 
@@ -320,8 +335,15 @@ class BoardView {
         container.appendChild(input);
         taskList.appendChild(container);
 
-        // 스크롤해서 input이 보이게
+        // ★ 세로 스크롤만 하도록 수정 (가로 스크롤 방지) ★
+        var boardContainer = column.closest('.board-container');
+        var savedScrollLeft = boardContainer ? boardContainer.scrollLeft : 0;
         input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        if (boardContainer) {
+            requestAnimationFrame(function() {
+                boardContainer.scrollLeft = savedScrollLeft;
+            });
+        }
         input.focus();
 
         var done = false;
@@ -353,12 +375,10 @@ class BoardView {
         });
     }
 
-    // ★★★ 수정: Child Add — 부모의 children 영역 안에 input 표시 ★★★
     _showChildQuickAdd(parent) {
         var self = this;
         var parentId = parent.Id;
 
-        // .task-node[data-task-id] 찾기 (task-node-self가 아닌 task-node)
         var allNodes = document.querySelectorAll('.task-node');
         var nodeEl = null;
         for (var i = 0; i < allNodes.length; i++) {
@@ -370,20 +390,16 @@ class BoardView {
         }
         if (!nodeEl) return;
 
-        // 부모가 접혀있으면 펼치기
         if (!parent.IsExpanded) {
             this.ds.updateExpandState(parentId, true);
-            // render 후 다시 찾아야 하므로 render 후 재호출
             var self2 = this;
             this.render();
-            // render 후 DOM이 갱신되므로 다시 찾기
             setTimeout(function() {
                 self2._showChildQuickAdd(self2.ds.getById(parentId));
             }, 50);
             return;
         }
 
-        // children 컨테이너 찾거나 만들기
         var childrenContainer = nodeEl.querySelector(':scope > .task-node-children');
         if (!childrenContainer) {
             childrenContainer = document.createElement('div');
@@ -391,7 +407,6 @@ class BoardView {
             nodeEl.appendChild(childrenContainer);
         }
 
-        // 이미 quick-add가 있으면 중복 방지
         if (childrenContainer.querySelector('.quick-add-container')) {
             childrenContainer.querySelector('.quick-add-input').focus();
             return;
@@ -407,8 +422,7 @@ class BoardView {
         container.appendChild(input);
         childrenContainer.appendChild(container);
 
-        // 스크롤해서 input이 보이게
-        input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        // ★ scrollIntoView 제거 — 가로 스크롤 리셋 방지 ★
         input.focus();
 
         var done = false;
