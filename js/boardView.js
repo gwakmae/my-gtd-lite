@@ -143,7 +143,8 @@ class BoardView {
         var actions = document.createElement('div');
         actions.className = 'header-actions';
         actions.innerHTML =
-            '<button class="btn-modern" id="btn-export" title="Export">📥 Export</button>' +
+            '<button class="btn-modern" id="btn-export" title="Export All">📥 Export</button>' +
+            '<button class="btn-modern" id="btn-export-selected" title="Export Selected" style="display:none">📋 Export Selected</button>' +
             '<button class="btn-modern" id="btn-import" title="Import">📤 Import</button>' +
             '<input type="file" id="import-file" accept=".json" style="display:none">' +
             '<button class="btn-modern" id="btn-undo" title="Undo (Ctrl+Z)" disabled>↩️ Undo</button>' +
@@ -161,6 +162,7 @@ class BoardView {
     _wireHeaderEvents(actions) {
         var self = this;
         var exportBtn = actions.querySelector('#btn-export');
+        var exportSelectedBtn = actions.querySelector('#btn-export-selected');
         var importBtn = actions.querySelector('#btn-import');
         var importFile = actions.querySelector('#import-file');
         var undoBtn = actions.querySelector('#btn-undo');
@@ -168,6 +170,16 @@ class BoardView {
         var showHiddenBtn = actions.querySelector('#btn-show-hidden');
 
         if (exportBtn) exportBtn.addEventListener('click', function() { self._exportData(); });
+
+        // ★ 선택된 항목 Export 버튼 표시/비표시 ★
+        if (exportSelectedBtn) {
+            if (self.selectedIds.size > 0) {
+                exportSelectedBtn.style.display = '';
+                exportSelectedBtn.textContent = '📋 Export Selected (' + self.selectedIds.size + ')';
+            }
+            exportSelectedBtn.addEventListener('click', function() { self._exportSelectedData(); });
+        }
+
         if (importBtn) importBtn.addEventListener('click', function() { importFile.click(); });
         if (importFile) importFile.addEventListener('change', function(e) { self._importData(e); });
         if (undoBtn) {
@@ -528,9 +540,15 @@ class BoardView {
         bar.className = 'bulk-action-bar';
         bar.innerHTML =
             '<span>' + this.selectedIds.size + ' tasks selected</span>' +
+            '<button class="btn-modern" id="bulk-export-btn">📋 Export</button>' +
             '<button class="btn-modern" id="bulk-edit-btn">✏️ Bulk Edit</button>' +
             '<button class="btn-modern" id="bulk-delete-btn">🗑️ Delete</button>' +
             '<button class="btn-modern" id="bulk-cancel-btn">✖ Cancel</button>';
+
+        // ★ Bulk Export 버튼 ★
+        bar.querySelector('#bulk-export-btn').addEventListener('click', function() {
+            self._exportSelectedData();
+        });
 
         bar.querySelector('#bulk-edit-btn').addEventListener('click', function() {
             self.bulkPanel.show(
@@ -614,6 +632,28 @@ class BoardView {
             a.click();
             URL.revokeObjectURL(url);
             this.toast.success('Data exported successfully');
+        } catch (e) {
+            this.toast.error('Export failed: ' + e.message);
+        }
+    }
+
+    // ★ 선택된 Task Export ★
+    _exportSelectedData() {
+        try {
+            var ids = Array.from(this.selectedIds);
+            if (ids.length === 0) {
+                this.toast.error('No tasks selected');
+                return;
+            }
+            var json = this.ds.exportSelectedToJson(ids);
+            var blob = new Blob([json], { type: 'application/json' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'gtd-selected-' + ids.length + '-tasks-' + new Date().toISOString().slice(0, 10) + '.json';
+            a.click();
+            URL.revokeObjectURL(url);
+            this.toast.success(ids.length + ' tasks exported (with children)');
         } catch (e) {
             this.toast.error('Export failed: ' + e.message);
         }
