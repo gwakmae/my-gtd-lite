@@ -16,6 +16,9 @@ class BoardView {
         // ★ 스크롤 위치 저장용 ★
         this._savedScrollLeft = 0;
 
+        // ★★★ 연속 입력 모드 플래그 ★★★
+        this._isQuickAdding = false;
+
         var self = this;
 
         this.nodeRenderer = new TaskNodeRenderer(dataService, {
@@ -67,6 +70,9 @@ class BoardView {
     }
 
     render() {
+        // ★★★ 연속 입력 중이면 렌더링 건너뛰기 ★★★
+        if (this._isQuickAdding) return;
+
         var container = document.getElementById('content-area');
         if (!container) return;
 
@@ -339,7 +345,7 @@ class BoardView {
         var input = document.createElement('input');
         input.type = 'text';
         input.className = 'quick-add-input';
-        input.placeholder = '새 작업 제목... (빈 상태에서 Enter = 종료)';
+        input.placeholder = '새 작업 제목... (빈 Enter = 종료)';
         container.appendChild(input);
         taskList.appendChild(container);
 
@@ -356,15 +362,16 @@ class BoardView {
 
         var done = false;
 
+        // ★★★ 연속 입력 모드 ON ★★★
+        self._isQuickAdding = true;
+
         input.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 if (input.value.trim()) {
                     if (!done) {
-                        done = true;
                         self.ds.addTask(input.value.trim(), status, null);
                         input.value = '';
-                        done = false;
                         input.focus();
                     }
                 } else {
@@ -385,6 +392,9 @@ class BoardView {
                 }
                 container.remove();
                 if (addBtn) addBtn.style.display = '';
+                // ★★★ 연속 입력 모드 OFF → 렌더링 ★★★
+                self._isQuickAdding = false;
+                self.render();
             }, 150);
         });
     }
@@ -440,15 +450,16 @@ class BoardView {
 
         var done = false;
 
+        // ★★★ 연속 입력 모드 ON ★★★
+        self._isQuickAdding = true;
+
         input.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 if (input.value.trim()) {
                     if (!done) {
-                        done = true;
                         self.ds.addTask(input.value.trim(), parent.Status, parentId);
                         input.value = '';
-                        done = false;
                         input.focus();
                     }
                 } else {
@@ -468,11 +479,14 @@ class BoardView {
                     self.ds.addTask(input.value.trim(), parent.Status, parentId);
                 }
                 container.remove();
+                // ★★★ 연속 입력 모드 OFF → 렌더링 ★★★
+                self._isQuickAdding = false;
+                self.render();
             }, 150);
         });
     }
 
-    // ★★★ 새 메서드: 선택된 태스크 아래에 형제 추가 ★★★
+    // ★★★ 선택된 태스크 아래에 형제 추가 ★★★
     _showSiblingQuickAdd(task) {
         var self = this;
         var taskId = task.Id;
@@ -523,15 +537,16 @@ class BoardView {
         var status = task.Status;
         var done = false;
 
+        // ★★★ 연속 입력 모드 ON ★★★
+        self._isQuickAdding = true;
+
         input.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 if (input.value.trim()) {
                     if (!done) {
-                        done = true;
                         self.ds.addTask(input.value.trim(), status, parentId);
                         input.value = '';
-                        done = false;
                         input.focus();
                     }
                 } else {
@@ -551,6 +566,9 @@ class BoardView {
                     self.ds.addTask(input.value.trim(), status, parentId);
                 }
                 container.remove();
+                // ★★★ 연속 입력 모드 OFF → 렌더링 ★★★
+                self._isQuickAdding = false;
+                self.render();
             }, 150);
         });
     }
