@@ -339,7 +339,7 @@ class BoardView {
         var input = document.createElement('input');
         input.type = 'text';
         input.className = 'quick-add-input';
-        input.placeholder = '새 작업 제목...';
+        input.placeholder = '새 작업 제목... (빈 상태에서 Enter = 종료)';
         container.appendChild(input);
         taskList.appendChild(container);
 
@@ -359,12 +359,18 @@ class BoardView {
         input.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                if (input.value.trim() && !done) {
+                if (input.value.trim()) {
+                    if (!done) {
+                        done = true;
+                        self.ds.addTask(input.value.trim(), status, null);
+                        input.value = '';
+                        done = false;
+                        input.focus();
+                    }
+                } else {
+                    // ★ 빈 Enter → 종료 ★
                     done = true;
-                    self.ds.addTask(input.value.trim(), status, null);
-                    input.value = '';
-                    done = false;
-                    input.focus();
+                    input.blur();
                 }
             } else if (e.key === 'Escape') {
                 done = true;
@@ -426,11 +432,10 @@ class BoardView {
         var input = document.createElement('input');
         input.type = 'text';
         input.className = 'quick-add-input';
-        input.placeholder = '하위 작업 제목...';
+        input.placeholder = '하위 작업 제목... (빈 Enter = 종료)';
         container.appendChild(input);
         childrenContainer.appendChild(container);
 
-        // ★ scrollIntoView 제거 — 가로 스크롤 리셋 방지 ★
         input.focus();
 
         var done = false;
@@ -438,12 +443,18 @@ class BoardView {
         input.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                if (input.value.trim() && !done) {
+                if (input.value.trim()) {
+                    if (!done) {
+                        done = true;
+                        self.ds.addTask(input.value.trim(), parent.Status, parentId);
+                        input.value = '';
+                        done = false;
+                        input.focus();
+                    }
+                } else {
+                    // ★ 빈 Enter → 종료 ★
                     done = true;
-                    self.ds.addTask(input.value.trim(), parent.Status, parentId);
-                    input.value = '';
-                    done = false;
-                    input.focus();
+                    input.blur();
                 }
             } else if (e.key === 'Escape') {
                 done = true;
@@ -455,6 +466,89 @@ class BoardView {
             setTimeout(function() {
                 if (!done && input.value.trim()) {
                     self.ds.addTask(input.value.trim(), parent.Status, parentId);
+                }
+                container.remove();
+            }, 150);
+        });
+    }
+
+    // ★★★ 새 메서드: 선택된 태스크 아래에 형제 추가 ★★★
+    _showSiblingQuickAdd(task) {
+        var self = this;
+        var taskId = task.Id;
+
+        // 해당 task-node 찾기
+        var allNodes = document.querySelectorAll('.task-node');
+        var nodeEl = null;
+        for (var i = 0; i < allNodes.length; i++) {
+            if (allNodes[i].dataset.taskId === String(taskId) &&
+                allNodes[i].classList.contains('task-node')) {
+                nodeEl = allNodes[i];
+                break;
+            }
+        }
+        if (!nodeEl) return;
+
+        // 이미 입력창이 열려있으면 포커스만
+        var existingInput = nodeEl.parentNode.querySelector('.quick-add-container.sibling-add');
+        if (existingInput) {
+            var inp = existingInput.querySelector('.quick-add-input');
+            if (inp) inp.focus();
+            return;
+        }
+
+        // 선택 해제
+        this.selectedIds.clear();
+        this.isMultiSelectMode = false;
+        // 선택 표시 갱신 (re-render 없이)
+        document.querySelectorAll('.task-node-self.is-selected, .task-node-self.is-multiselected').forEach(function(el) {
+            el.classList.remove('is-selected', 'is-multiselected');
+        });
+
+        var container = document.createElement('div');
+        container.className = 'quick-add-container sibling-add';
+
+        var input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'quick-add-input';
+        input.placeholder = '새 형제 작업... (빈 Enter = 종료)';
+        container.appendChild(input);
+
+        // task-node 바로 뒤에 삽입
+        nodeEl.parentNode.insertBefore(container, nodeEl.nextSibling);
+
+        input.focus();
+
+        var parentId = task.ParentId;
+        var status = task.Status;
+        var done = false;
+
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (input.value.trim()) {
+                    if (!done) {
+                        done = true;
+                        self.ds.addTask(input.value.trim(), status, parentId);
+                        input.value = '';
+                        done = false;
+                        input.focus();
+                    }
+                } else {
+                    // ★ 빈 Enter → 종료 ★
+                    done = true;
+                    input.blur();
+                }
+            } else if (e.key === 'Escape') {
+                done = true;
+                input.blur();
+            }
+        });
+
+        input.addEventListener('blur', function() {
+            setTimeout(function() {
+                if (!done && input.value.trim()) {
+                    self.ds.addTask(input.value.trim(), status, parentId);
                 }
                 container.remove();
             }, 150);
