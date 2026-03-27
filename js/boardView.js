@@ -140,11 +140,15 @@ class BoardView {
                 '<span class="stat-value">' + focusTasks.length + '</span>' +
             '</div>';
 
+        var hasSelection = this.selectedIds.size > 0;
+
         var actions = document.createElement('div');
         actions.className = 'header-actions';
         actions.innerHTML =
-            '<button class="btn-modern" id="btn-export" title="Export All">📥 Export</button>' +
-            '<button class="btn-modern" id="btn-export-selected" title="Export Selected" style="display:none">📋 Export Selected</button>' +
+            '<button class="btn-modern" id="btn-export" title="Export All (전체 백업)">📥 Export All</button>' +
+            (hasSelection
+                ? '<button class="btn-modern btn-export-selected" id="btn-export-selected" title="Export Selected Tasks">📋 Export Selected (' + this.selectedIds.size + ')</button>'
+                : '') +
             '<button class="btn-modern" id="btn-import" title="Import">📤 Import</button>' +
             '<input type="file" id="import-file" accept=".json" style="display:none">' +
             '<button class="btn-modern" id="btn-undo" title="Undo (Ctrl+Z)" disabled>↩️ Undo</button>' +
@@ -170,15 +174,7 @@ class BoardView {
         var showHiddenBtn = actions.querySelector('#btn-show-hidden');
 
         if (exportBtn) exportBtn.addEventListener('click', function() { self._exportData(); });
-
-        // ★ 선택된 항목 Export 버튼 표시/비표시 ★
-        if (exportSelectedBtn) {
-            if (self.selectedIds.size > 0) {
-                exportSelectedBtn.style.display = '';
-                exportSelectedBtn.textContent = '📋 Export Selected (' + self.selectedIds.size + ')';
-            }
-            exportSelectedBtn.addEventListener('click', function() { self._exportSelectedData(); });
-        }
+        if (exportSelectedBtn) exportSelectedBtn.addEventListener('click', function() { self._exportSelectedData(); });
 
         if (importBtn) importBtn.addEventListener('click', function() { importFile.click(); });
         if (importFile) importFile.addEventListener('change', function(e) { self._importData(e); });
@@ -533,43 +529,46 @@ class BoardView {
     }
 
     _renderBulkBar() {
-        if (this.selectedIds.size < 2) return null;
+        if (this.selectedIds.size < 1) return null;
 
         var self = this;
+        var count = this.selectedIds.size;
         var bar = document.createElement('div');
         bar.className = 'bulk-action-bar';
         bar.innerHTML =
-            '<span>' + this.selectedIds.size + ' tasks selected</span>' +
-            '<button class="btn-modern" id="bulk-export-btn">📋 Export</button>' +
-            '<button class="btn-modern" id="bulk-edit-btn">✏️ Bulk Edit</button>' +
+            '<span>' + count + ' task' + (count > 1 ? 's' : '') + ' selected</span>' +
+            '<button class="btn-modern" id="bulk-export-btn">📋 Export Selected</button>' +
+            (count >= 2 ? '<button class="btn-modern" id="bulk-edit-btn">✏️ Bulk Edit</button>' : '') +
             '<button class="btn-modern" id="bulk-delete-btn">🗑️ Delete</button>' +
             '<button class="btn-modern" id="bulk-cancel-btn">✖ Cancel</button>';
 
-        // ★ Bulk Export 버튼 ★
         bar.querySelector('#bulk-export-btn').addEventListener('click', function() {
             self._exportSelectedData();
         });
 
-        bar.querySelector('#bulk-edit-btn').addEventListener('click', function() {
-            self.bulkPanel.show(
-                self.selectedIds,
-                function(model) {
-                    var snapshots = [];
-                    model.taskIds.forEach(function(id) {
-                        var t = self.ds.getById(id);
-                        if (t) snapshots.push(t.clone());
-                    });
-                    self.ds.bulkUpdate(model);
-                    self.undo.push({
-                        desc: 'Bulk edited ' + model.taskIds.length + ' tasks',
-                        undo: function() { self.ds.restoreTasks(snapshots); }
-                    });
-                    self.selectedIds.clear();
-                    self.render();
-                },
-                function() { }
-            );
-        });
+        var editBtn = bar.querySelector('#bulk-edit-btn');
+        if (editBtn) {
+            editBtn.addEventListener('click', function() {
+                self.bulkPanel.show(
+                    self.selectedIds,
+                    function(model) {
+                        var snapshots = [];
+                        model.taskIds.forEach(function(id) {
+                            var t = self.ds.getById(id);
+                            if (t) snapshots.push(t.clone());
+                        });
+                        self.ds.bulkUpdate(model);
+                        self.undo.push({
+                            desc: 'Bulk edited ' + model.taskIds.length + ' tasks',
+                            undo: function() { self.ds.restoreTasks(snapshots); }
+                        });
+                        self.selectedIds.clear();
+                        self.render();
+                    },
+                    function() { }
+                );
+            });
+        }
 
         bar.querySelector('#bulk-delete-btn').addEventListener('click', function() {
             if (confirm(self.selectedIds.size + '개 작업을 삭제하시겠습니까?')) {
@@ -637,7 +636,6 @@ class BoardView {
         }
     }
 
-    // ★ 선택된 Task Export ★
     _exportSelectedData() {
         try {
             var ids = Array.from(this.selectedIds);
