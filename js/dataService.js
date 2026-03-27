@@ -10,10 +10,21 @@ class DataService {
         this._syncStatus = document.getElementById('sync-status');
         this._offlineBadge = document.getElementById('offline-badge');
         this._isSyncing = false;
+        // ★★★ 연속 입력용: notify 일시 억제 플래그 ★★★
+        this._suppressNotify = false;
     }
 
     onChange(fn) { this._listeners.push(fn); }
-    _notify() { this._listeners.forEach(fn => fn()); }
+
+    _notify() {
+        // ★★★ 억제 중이면 알림 건너뛰기 ★★★
+        if (this._suppressNotify) return;
+        this._listeners.forEach(fn => fn());
+    }
+
+    // ★★★ 연속 입력 모드 제어 메서드 ★★★
+    suppressNotifications() { this._suppressNotify = true; }
+    resumeNotifications() { this._suppressNotify = false; this._notify(); }
 
     init() { this._loadFromLocalStorage(); }
 
@@ -316,10 +327,6 @@ class DataService {
         this._saveAndNotify();
     }
 
-    // ★★★ 수정: toggleComplete ★★★
-    // - 체크하면 해당 태스크(+자식)만 IsCompleted=true, Status=Completed로 이동
-    // - 부모는 자동 완료하지 않음 (사용자가 직접 부모를 체크해야 함)
-    // - 체크 해제하면 해당 태스크(+자식)를 원래 Status로 복원
     toggleComplete(id) {
         var task = this.getById(id);
         if (!task) return;
@@ -339,16 +346,10 @@ class DataService {
                 t.Status = t.OriginalStatus || TaskStatus.NextActions;
                 t.OriginalStatus = null;
             }
-            // 자식들도 함께 완료/해제
             self._tasks.filter(function(c) { return c.ParentId === t.Id; }).forEach(function(c) { updateRec(c, isCompleted); });
         };
 
         updateRec(task, completed);
-
-        // ★ 부모 자동 완료 로직 제거 ★
-        // 이전: 자식 모두 완료 시 부모도 자동 완료
-        // 변경: 부모는 사용자가 직접 체크해야 완료됨
-
         this._saveAndNotify();
     }
 
@@ -447,16 +448,13 @@ class DataService {
         return JSON.stringify(data, null, 2);
     }
 
-    // ★ 선택된 Task들만 Export (해당 Task + 모든 하위 자식 포함) ★
     exportSelectedToJson(taskIds) {
         var self = this;
         var allIds = this._getAllDescendantIds(taskIds);
         var selectedTasks = this._tasks.filter(function(t) { return allIds.has(t.Id); });
 
-        // 선택된 task들의 ID 세트
         var selectedIdSet = new Set(selectedTasks.map(function(t) { return t.Id; }));
 
-        // 트리 구조로 변환
         var buildHierarchy = function(tasks) {
             var map = {};
             var roots = [];
@@ -485,7 +483,6 @@ class DataService {
                     roots.push(map[t.Id]);
                 }
             });
-            // Sort children
             var sortRec = function(items) {
                 items.sort(function(a, b) { return a.SortOrder - b.SortOrder; });
                 items.forEach(function(i) { sortRec(i.Children); });
@@ -496,7 +493,6 @@ class DataService {
 
         var hierarchy = buildHierarchy(selectedTasks);
 
-        // flat 리스트도 포함 (import 호환을 위해)
         var flatTasks = selectedTasks.map(function(t) {
             var p = Object.assign({}, t);
             delete p.Children;
