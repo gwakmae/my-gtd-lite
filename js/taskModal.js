@@ -3,6 +3,7 @@ class TaskModal {
         this.ds = dataService;
         this._onSave = null;
         this._backdropEl = null;
+        this._mouseDownInsideModal = false;
     }
 
     open(taskId, onSave) {
@@ -132,14 +133,39 @@ class TaskModal {
         container.appendChild(footer);
         this._backdropEl.appendChild(container);
 
+        // ★ 모달 드래그 보호: mousedown이 모달 내부에서 시작되었는지 추적 ★
+        this._mouseDownInsideModal = false;
+
+        container.addEventListener('mousedown', () => {
+            this._mouseDownInsideModal = true;
+        });
+
+        document.addEventListener('mouseup', this._onGlobalMouseUp = () => {
+            // mouseup 후 다음 tick에서 리셋 (click 이벤트가 먼저 처리되도록)
+            setTimeout(() => {
+                this._mouseDownInsideModal = false;
+            }, 0);
+        });
+
         this._backdropEl.addEventListener('click', (e) => {
-            if (e.target === this._backdropEl && window.innerWidth >= 768) {
+            // 바깥 클릭으로 닫기: backdrop 자체를 클릭했고, 데스크탑이며, 
+            // mousedown이 모달 내부에서 시작되지 않은 경우에만 닫기
+            if (e.target === this._backdropEl && window.innerWidth >= 768 && !this._mouseDownInsideModal) {
                 this.close();
             }
         });
 
         document.body.appendChild(this._backdropEl);
         document.body.style.overflow = 'hidden';
+
+        // ★ Ctrl+Enter로 Save Changes ★
+        this._onKeyDown = (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                this._doSave(local, body);
+            }
+        };
+        this._backdropEl.addEventListener('keydown', this._onKeyDown);
 
         setTimeout(() => {
             const addCtxBtn = document.getElementById('modal-add-ctx-btn');
@@ -204,6 +230,11 @@ class TaskModal {
     }
 
     close() {
+        // ★ 이벤트 리스너 정리 ★
+        if (this._onGlobalMouseUp) {
+            document.removeEventListener('mouseup', this._onGlobalMouseUp);
+            this._onGlobalMouseUp = null;
+        }
         if (this._backdropEl) {
             this._backdropEl.remove();
             this._backdropEl = null;
