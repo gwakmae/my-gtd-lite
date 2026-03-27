@@ -86,15 +86,12 @@ const app = {
             loginBtn.addEventListener('click', async () => {
                 try {
                     if (this._isInAppBrowser()) {
-                        // 인앱 브라우저: 리다이렉트 방식
                         await fb.auth.signInWithRedirect(fb.provider);
                     } else {
-                        // 일반 브라우저: 팝업 방식
                         await fb.auth.signInWithPopup(fb.provider);
                     }
                 } catch (e) {
                     console.error('[Auth] Login error:', e);
-                    // 팝업 차단된 경우 리다이렉트로 재시도
                     if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
                         try {
                             await fb.auth.signInWithRedirect(fb.provider);
@@ -108,9 +105,7 @@ const app = {
             });
         }
 
-        // 리다이렉트 결과 처리
         fb.auth.getRedirectResult().then(function(result) {
-            // onAuthStateChanged에서 처리됨
         }).catch((e) => {
             if (e.code && e.code !== 'auth/no-auth-event') {
                 console.error('[Auth] Redirect error:', e);
@@ -254,6 +249,19 @@ const app = {
         if (e.key === 'Escape') {
             if (this.currentRoute === 'board') this.boardView.deselectAll();
         }
+
+        // ★ Enter: 선택된 태스크가 1개일 때 형제 추가 모드 ★
+        if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+            if (this.currentRoute === 'board' && this.boardView.selectedIds.size === 1) {
+                var selectedId = Array.from(this.boardView.selectedIds)[0];
+                var task = this.ds.getById(selectedId);
+                if (task) {
+                    e.preventDefault();
+                    this.boardView._showSiblingQuickAdd(task);
+                }
+            }
+        }
+
         if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
             if (this.currentRoute === 'board') {
                 e.preventDefault();
