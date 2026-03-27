@@ -13,8 +13,11 @@ class BoardView {
         this.hideCompleted = localStorage.getItem('gtd-hide-completed') === 'true';
         this.showHidden = localStorage.getItem('gtd-show-hidden') === 'true';
 
-        // ★ 스크롤 위치 저장용 ★
         this._savedScrollLeft = 0;
+
+        // ★★★ 연속 입력 상태 저장 ★★★
+        // type: 'column' | 'child' | 'sibling', status, parentId, anchorTaskId
+        this._quickAddState = null;
 
         var self = this;
 
@@ -70,7 +73,6 @@ class BoardView {
         var container = document.getElementById('content-area');
         if (!container) return;
 
-        // ★★★ 스크롤 위치 저장 ★★★
         var oldBoard = container.querySelector('.board-container');
         if (oldBoard) {
             this._savedScrollLeft = oldBoard.scrollLeft;
@@ -98,7 +100,6 @@ class BoardView {
 
         container.appendChild(boardContainer);
 
-        // ★★★ 스크롤 위치 복원 ★★★
         var savedScroll = this._savedScrollLeft;
         if (savedScroll > 0) {
             requestAnimationFrame(function() {
@@ -111,6 +112,47 @@ class BoardView {
 
         this.dragDrop.setSelectedIds(this.selectedIds);
         this.renderedTasks = this._buildRenderedList();
+
+        // ★★★ 연속 입력 중이었으면 입력창 자동 복원 ★★★
+        if (this._quickAddState) {
+            var st = this._quickAddState;
+            if (st.type === 'column') {
+                this._reopenColumnQuickAdd(st.status);
+            } else if (st.type === 'child') {
+                this._reopenChildQuickAdd(st.parentId);
+            } else if (st.type === 'sibling') {
+                this._reopenSiblingQuickAdd(st.anchorTaskId, st.status, st.parentId);
+            }
+        }
+    }
+
+    // ★★★ render 후 컬럼 입력창 복원 ★★★
+    _reopenColumnQuickAdd(status) {
+        var col = document.querySelector('.board-column[data-status="' + status + '"]');
+        if (!col) return;
+        var addBtn = col.querySelector('.add-task-btn');
+        this._showQuickAdd(col, status, addBtn);
+    }
+
+    // ★★★ render 후 자식 입력창 복원 ★★★
+    _reopenChildQuickAdd(parentId) {
+        var parent = this.ds.getById(parentId);
+        if (parent) this._showChildQuickAdd(parent);
+    }
+
+    // ★★★ render 후 형제 입력창 복원 ★★★
+    _reopenSiblingQuickAdd(anchorTaskId, status, parentId) {
+        var task = this.ds.getById(anchorTaskId);
+        if (!task) {
+            // anchor가 없으면 같은 그룹의 마지막 태스크를 anchor로
+            var siblings = this.ds.getRawTasks().filter(function(t) {
+                return t.ParentId === parentId && t.Status === status;
+            }).sort(function(a, b) { return a.SortOrder - b.SortOrder; });
+            if (siblings.length > 0) {
+                task = siblings[siblings.length - 1];
+            }
+        }
+        if (task) this._showSiblingQuickAdd(task);
     }
 
     _renderHeader() {
@@ -324,7 +366,7 @@ class BoardView {
         });
     }
 
-    // ★★★ 연속 입력 지원: suppressNotifications / resumeNotifications 사용 ★★★
+    // ★★★ 컬럼 quick add — 연속 입력 지원 ★★★
     _showQuickAdd(column, status, addBtn) {
         var self = this;
         if (addBtn) addBtn.style.display = 'none';
@@ -344,7 +386,6 @@ class BoardView {
         container.appendChild(input);
         taskList.appendChild(container);
 
-        // ★ 세로 스크롤만 하도록 수정 (가로 스크롤 방지) ★
         var boardContainer = column.closest('.board-container');
         var savedScrollLeft = boardContainer ? boardContainer.scrollLeft : 0;
         input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -355,46 +396,46 @@ class BoardView {
         }
         input.focus();
 
-        var done = false;
-        var addedCount = 0;
+        // ★ 연속 입력 상태 기록 ★
+        self._quickAddState = { type: 'column', status: status };
 
-        // ★★★ 연속 입력 시작: notify 억제 ★★★
-        self.ds.suppressNotifications();
+        var done = false;
 
         input.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 if (input.value.trim()) {
+                    // addTask → _saveAndNotify → _notify → render → _quickAddState로 입력창 복원
                     self.ds.addTask(input.value.trim(), status, null);
-                    addedCount++;
-                    input.value = '';
-                    input.focus();
+                    // render가 동기적으로 호출되어 입력창이 자동 재생성됨
                 } else {
-                    // ★ 빈 Enter → 종료 ★
                     done = true;
+                    self._quickAddState = null;
                     input.blur();
                 }
             } else if (e.key === 'Escape') {
                 done = true;
+                self._quickAddState = null;
                 input.blur();
             }
         });
 
         input.addEventListener('blur', function() {
-            setTimeout(function() {
-                if (!done && input.value.trim()) {
-                    self.ds.addTask(input.value.trim(), status, null);
-                    addedCount++;
-                }
-                container.remove();
-                if (addBtn) addBtn.style.display = '';
-                // ★★★ 연속 입력 종료: notify 복원 → 자동으로 render 트리거 ★★★
-                self.ds.resumeNotifications();
-            }, 150);
+            if (done) {
+                setTimeout(function() {
+                    if (container.parentNode) container.remove();
+                    if (addBtn) addBtn.style.display = '';
+                    // 상태가 이미 null이면 render 안함 (render에서 복원 안하도록)
+                    if (!self._quickAddState) {
+                        self.render();
+                    }
+                }, 100);
+            }
+            // done이 아닌 경우(render에 의한 DOM 교체)는 무시 — 새 입력창이 render에서 생성됨
         });
     }
 
-    // ★★★ 하위 작업 연속 입력 지원 ★★★
+    // ★★★ 하위 작업 quick add — 연속 입력 지원 ★★★
     _showChildQuickAdd(parent) {
         var self = this;
         var parentId = parent.Id;
@@ -444,50 +485,45 @@ class BoardView {
 
         input.focus();
 
-        var done = false;
-        var addedCount = 0;
+        // ★ 연속 입력 상태 기록 ★
+        self._quickAddState = { type: 'child', parentId: parentId };
 
-        // ★★★ 연속 입력 시작: notify 억제 ★★★
-        self.ds.suppressNotifications();
+        var done = false;
 
         input.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 if (input.value.trim()) {
                     self.ds.addTask(input.value.trim(), parent.Status, parentId);
-                    addedCount++;
-                    input.value = '';
-                    input.focus();
                 } else {
-                    // ★ 빈 Enter → 종료 ★
                     done = true;
+                    self._quickAddState = null;
                     input.blur();
                 }
             } else if (e.key === 'Escape') {
                 done = true;
+                self._quickAddState = null;
                 input.blur();
             }
         });
 
         input.addEventListener('blur', function() {
-            setTimeout(function() {
-                if (!done && input.value.trim()) {
-                    self.ds.addTask(input.value.trim(), parent.Status, parentId);
-                    addedCount++;
-                }
-                container.remove();
-                // ★★★ 연속 입력 종료: notify 복원 → 자동으로 render 트리거 ★★★
-                self.ds.resumeNotifications();
-            }, 150);
+            if (done) {
+                setTimeout(function() {
+                    if (container.parentNode) container.remove();
+                    if (!self._quickAddState) {
+                        self.render();
+                    }
+                }, 100);
+            }
         });
     }
 
-    // ★★★ 형제 작업 연속 입력 (태스크 선택 후 Enter) ★★★
+    // ★★★ 형제 작업 quick add — 연속 입력 지원 ★★★
     _showSiblingQuickAdd(task) {
         var self = this;
         var taskId = task.Id;
 
-        // 해당 task-node 찾기
         var allNodes = document.querySelectorAll('.task-node');
         var nodeEl = null;
         for (var i = 0; i < allNodes.length; i++) {
@@ -510,7 +546,6 @@ class BoardView {
         // 선택 해제
         this.selectedIds.clear();
         this.isMultiSelectMode = false;
-        // 선택 표시 갱신 (re-render 없이)
         document.querySelectorAll('.task-node-self.is-selected, .task-node-self.is-multiselected').forEach(function(el) {
             el.classList.remove('is-selected', 'is-multiselected');
         });
@@ -524,48 +559,48 @@ class BoardView {
         input.placeholder = '새 형제 작업... (빈 Enter = 종료)';
         container.appendChild(input);
 
-        // task-node 바로 뒤에 삽입
         nodeEl.parentNode.insertBefore(container, nodeEl.nextSibling);
 
         input.focus();
 
         var parentId = task.ParentId;
         var status = task.Status;
-        var done = false;
-        var addedCount = 0;
 
-        // ★★★ 연속 입력 시작: notify 억제 ★★★
-        self.ds.suppressNotifications();
+        // ★ 연속 입력 상태 기록 ★
+        self._quickAddState = { type: 'sibling', anchorTaskId: taskId, status: status, parentId: parentId };
+
+        var done = false;
 
         input.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 if (input.value.trim()) {
-                    self.ds.addTask(input.value.trim(), status, parentId);
-                    addedCount++;
-                    input.value = '';
-                    input.focus();
+                    var newTask = self.ds.addTask(input.value.trim(), status, parentId);
+                    // anchor를 방금 추가한 태스크로 갱신 → 다음 render 시 이 태스크 바로 뒤에 입력창
+                    if (newTask) {
+                        self._quickAddState.anchorTaskId = newTask.Id;
+                    }
                 } else {
-                    // ★ 빈 Enter → 종료 ★
                     done = true;
+                    self._quickAddState = null;
                     input.blur();
                 }
             } else if (e.key === 'Escape') {
                 done = true;
+                self._quickAddState = null;
                 input.blur();
             }
         });
 
         input.addEventListener('blur', function() {
-            setTimeout(function() {
-                if (!done && input.value.trim()) {
-                    self.ds.addTask(input.value.trim(), status, parentId);
-                    addedCount++;
-                }
-                container.remove();
-                // ★★★ 연속 입력 종료: notify 복원 → 자동으로 render 트리거 ★★★
-                self.ds.resumeNotifications();
-            }, 150);
+            if (done) {
+                setTimeout(function() {
+                    if (container.parentNode) container.remove();
+                    if (!self._quickAddState) {
+                        self.render();
+                    }
+                }, 100);
+            }
         });
     }
 
