@@ -10,21 +10,10 @@ class DataService {
         this._syncStatus = document.getElementById('sync-status');
         this._offlineBadge = document.getElementById('offline-badge');
         this._isSyncing = false;
-        // ★★★ 연속 입력용: notify 일시 억제 플래그 ★★★
-        this._suppressNotify = false;
     }
 
     onChange(fn) { this._listeners.push(fn); }
-
-    _notify() {
-        // ★★★ 억제 중이면 알림 건너뛰기 ★★★
-        if (this._suppressNotify) return;
-        this._listeners.forEach(fn => fn());
-    }
-
-    // ★★★ 연속 입력 모드 제어 메서드 ★★★
-    suppressNotifications() { this._suppressNotify = true; }
-    resumeNotifications() { this._suppressNotify = false; this._notify(); }
+    _notify() { this._listeners.forEach(fn => fn()); }
 
     init() { this._loadFromLocalStorage(); }
 
