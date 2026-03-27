@@ -447,6 +447,72 @@ class DataService {
         return JSON.stringify(data, null, 2);
     }
 
+    // ★ 선택된 Task들만 Export (해당 Task + 모든 하위 자식 포함) ★
+    exportSelectedToJson(taskIds) {
+        var self = this;
+        var allIds = this._getAllDescendantIds(taskIds);
+        var selectedTasks = this._tasks.filter(function(t) { return allIds.has(t.Id); });
+
+        // 선택된 task들의 ID 세트
+        var selectedIdSet = new Set(selectedTasks.map(function(t) { return t.Id; }));
+
+        // 트리 구조로 변환
+        var buildHierarchy = function(tasks) {
+            var map = {};
+            var roots = [];
+            tasks.forEach(function(t) {
+                var obj = {
+                    Id: t.Id,
+                    Title: t.Title,
+                    Description: t.Description || '',
+                    Priority: t.Priority,
+                    Status: t.Status,
+                    ParentId: t.ParentId,
+                    SortOrder: t.SortOrder,
+                    IsCompleted: t.IsCompleted,
+                    StartDate: t.StartDate,
+                    DueDate: t.DueDate,
+                    Contexts: t.Contexts ? [].concat(t.Contexts) : [],
+                    IsHidden: t.IsHidden,
+                    Children: []
+                };
+                map[t.Id] = obj;
+            });
+            tasks.forEach(function(t) {
+                if (t.ParentId != null && map[t.ParentId]) {
+                    map[t.ParentId].Children.push(map[t.Id]);
+                } else {
+                    roots.push(map[t.Id]);
+                }
+            });
+            // Sort children
+            var sortRec = function(items) {
+                items.sort(function(a, b) { return a.SortOrder - b.SortOrder; });
+                items.forEach(function(i) { sortRec(i.Children); });
+            };
+            sortRec(roots);
+            return roots;
+        };
+
+        var hierarchy = buildHierarchy(selectedTasks);
+
+        // flat 리스트도 포함 (import 호환을 위해)
+        var flatTasks = selectedTasks.map(function(t) {
+            var p = Object.assign({}, t);
+            delete p.Children;
+            return p;
+        });
+
+        var data = {
+            exportDate: new Date().toISOString(),
+            exportType: 'selected',
+            taskCount: selectedTasks.length,
+            tasks: flatTasks,
+            hierarchy: hierarchy
+        };
+        return JSON.stringify(data, null, 2);
+    }
+
     importFromJson(jsonStr) {
         var data = JSON.parse(jsonStr); var tasks = data.tasks || data;
         if (!Array.isArray(tasks) || tasks.length === 0) throw new Error('파일에 유효한 태스크 데이터가 없습니다.');
