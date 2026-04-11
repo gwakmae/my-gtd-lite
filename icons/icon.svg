@@ -1,0 +1,13 @@
+<!-- icons/icon.svg -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="100" fill="#4A90D9"/>
+  <!-- 체크리스트 아이콘 -->
+  <rect x="80" y="130" width="260" height="36" rx="10" fill="white" opacity="0.3"/>
+  <rect x="80" y="238" width="260" height="36" rx="10" fill="white" opacity="0.3"/>
+  <rect x="80" y="346" width="200" height="36" rx="10" fill="white" opacity="0.3"/>
+  <!-- 체크마크 -->
+  <circle cx="370" cy="148" r="28" fill="white"/>
+  <polyline points="357,148 365,158 385,136" fill="none" stroke="#4A90D9" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="370" cy="256" r="28" fill="white"/>
+  <polyline points="357,256 365,266 385,244" fill="none" stroke="#4A90D9" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
