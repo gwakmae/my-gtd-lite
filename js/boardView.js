@@ -14,6 +14,7 @@ class BoardView {
         this.showHidden = localStorage.getItem('gtd-show-hidden') === 'true';
 
         this._savedScrollLeft = 0;
+        this._savedScrollTop = 0; // 👈 세로 스크롤 저장용 변수 추가
 
         // ★★★ 연속 입력 상태 ★★★
         this._quickAddState = null;
@@ -22,44 +23,44 @@ class BoardView {
         var self = this;
 
         this.nodeRenderer = new TaskNodeRenderer(dataService, {
-            onTaskClick: function(taskId, e) {
+            onTaskClick: function (taskId, e) {
                 var task = self.ds.getById(taskId);
                 if (task) self._handleTaskClick(task, e);
             },
-            onDoubleClick: function(taskId) {
+            onDoubleClick: function (taskId) {
                 var task = self.ds.getById(taskId);
                 if (task) self._openModal(task);
             },
-            onToggleComplete: function(taskId) {
+            onToggleComplete: function (taskId) {
                 self.ds.toggleComplete(taskId);
             },
-            onDelete: function(taskId) {
+            onDelete: function (taskId) {
                 var task = self.ds.getById(taskId);
                 if (task) self._deleteTask(task);
             },
-            onAddChild: function(taskId) {
+            onAddChild: function (taskId) {
                 var task = self.ds.getById(taskId);
                 if (task) self._showChildQuickAdd(task);
             },
-            onDragStart: function(taskId, el) {
+            onDragStart: function (taskId, el) {
                 self.dragDrop.setSelectedIds(self.selectedIds);
                 self.dragDrop.startDrag(taskId, el);
             },
-            onDragEnd: function() { self.dragDrop.endDrag(); },
-            onDrop: function(targetId, position) { self._handleDrop(targetId, position); },
-            getDraggedId: function() { return self.dragDrop.getDraggedId(); },
-            onRefresh: function() { self.render(); },
-            onDropColumnTop: function(status) {
+            onDragEnd: function () { self.dragDrop.endDrag(); },
+            onDrop: function (targetId, position) { self._handleDrop(targetId, position); },
+            getDraggedId: function () { return self.dragDrop.getDraggedId(); },
+            onRefresh: function () { self.render(); },
+            onDropColumnTop: function (status) {
                 var ids = self.dragDrop.getIdsToMove();
                 if (ids.length > 0 && status) {
                     self.ds.moveTasks(ids, status, null, 0);
                 }
                 self.dragDrop.endDrag();
             },
-            onDropColumnEmpty: function(status) {
+            onDropColumnEmpty: function (status) {
                 var ids = self.dragDrop.getIdsToMove();
                 if (ids.length > 0 && status) {
-                    var siblings = self.ds.getRawTasks().filter(function(t) {
+                    var siblings = self.ds.getRawTasks().filter(function (t) {
                         return t.ParentId == null && t.Status === status;
                     });
                     self.ds.moveTasks(ids, status, null, siblings.length);
@@ -76,6 +77,7 @@ class BoardView {
         var oldBoard = container.querySelector('.board-container');
         if (oldBoard) {
             this._savedScrollLeft = oldBoard.scrollLeft;
+            this._savedScrollTop = oldBoard.scrollTop; // 👈 세로 스크롤 상태 백업
         }
 
         container.innerHTML = '';
@@ -92,7 +94,7 @@ class BoardView {
         boardContainer.appendChild(todayCol);
 
         var self = this;
-        TaskStatusList.forEach(function(status) {
+        TaskStatusList.forEach(function (status) {
             var tasks = self.ds.getTasksForStatus(status);
             var col = self._renderColumn(status, tasks, status, false);
             boardContainer.appendChild(col);
@@ -100,10 +102,12 @@ class BoardView {
 
         container.appendChild(boardContainer);
 
-        var savedScroll = this._savedScrollLeft;
-        if (savedScroll > 0) {
-            requestAnimationFrame(function() {
-                boardContainer.scrollLeft = savedScroll;
+        var savedScrollX = this._savedScrollLeft;
+        var savedScrollY = this._savedScrollTop;
+        if (savedScrollX > 0 || savedScrollY > 0) {
+            requestAnimationFrame(function () {
+                if (savedScrollX > 0) boardContainer.scrollLeft = savedScrollX;
+                if (savedScrollY > 0) boardContainer.scrollTop = savedScrollY; // 👈 세로 스크롤 상태 복원
             });
         }
 
@@ -173,9 +177,9 @@ class BoardView {
             }
             if (!anchorEl) {
                 // anchor 못 찾으면 같은 그룹 마지막 태스크
-                var siblings = this.ds.getRawTasks().filter(function(t) {
+                var siblings = this.ds.getRawTasks().filter(function (t) {
                     return t.ParentId === parentId && t.Status === status;
-                }).sort(function(a, b) { return a.SortOrder - b.SortOrder; });
+                }).sort(function (a, b) { return a.SortOrder - b.SortOrder; });
                 if (siblings.length > 0) {
                     var lastId = siblings[siblings.length - 1].Id;
                     for (var k = 0; k < allNodes2.length; k++) {
@@ -190,10 +194,14 @@ class BoardView {
         // 스크롤 보정 & 포커스
         var boardContainer = container.closest('.board-container');
         var savedScrollLeft = boardContainer ? boardContainer.scrollLeft : 0;
+        var savedScrollTop = boardContainer ? boardContainer.scrollTop : 0; // 👈 세로 스크롤 상태 백업
+
         input.focus();
+
         if (boardContainer) {
-            requestAnimationFrame(function() {
+            requestAnimationFrame(function () {
                 boardContainer.scrollLeft = savedScrollLeft;
+                boardContainer.scrollTop = savedScrollTop; // 👈 세로 스크롤 상태 복원
             });
         }
 
@@ -203,7 +211,7 @@ class BoardView {
         // 상태 기록
         self._quickAddState = { type: type, status: status, parentId: parentId, anchorTaskId: anchorTaskId };
 
-        input.addEventListener('keydown', function(e) {
+        input.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 var val = input.value.trim();
@@ -239,8 +247,8 @@ class BoardView {
         });
 
         // blur: stale 입력창만 처리 (render에 의해 DOM에서 떨어진 경우 무시)
-        input.addEventListener('blur', function() {
-            setTimeout(function() {
+        input.addEventListener('blur', function () {
+            setTimeout(function () {
                 // 이미 다음 세대 입력창이 열렸으면 이 blur는 무시
                 if (self._quickAddId !== myId) return;
                 // 아직 이 입력창이 현역인데 blur됨 = 사용자가 다른 곳 클릭
@@ -274,18 +282,18 @@ class BoardView {
 
         stats.innerHTML =
             '<div class="stat-item">' +
-                '<span class="stat-label">Active</span>' +
-                '<span class="stat-value">' + activeTasks.length + '</span>' +
+            '<span class="stat-label">Active</span>' +
+            '<span class="stat-value">' + activeTasks.length + '</span>' +
             '</div>' +
             '<span class="stat-separator">|</span>' +
             '<div class="stat-item">' +
-                '<span class="stat-label">Today</span>' +
-                '<span class="stat-value">' + todayTasks.length + '</span>' +
+            '<span class="stat-label">Today</span>' +
+            '<span class="stat-value">' + todayTasks.length + '</span>' +
             '</div>' +
             '<span class="stat-separator">|</span>' +
             '<div class="stat-item">' +
-                '<span class="stat-label">Focus</span>' +
-                '<span class="stat-value">' + focusTasks.length + '</span>' +
+            '<span class="stat-label">Focus</span>' +
+            '<span class="stat-value">' + focusTasks.length + '</span>' +
             '</div>';
 
         var hasSelection = this.selectedIds.size > 0;
@@ -321,27 +329,27 @@ class BoardView {
         var hideCompletedBtn = actions.querySelector('#btn-hide-completed');
         var showHiddenBtn = actions.querySelector('#btn-show-hidden');
 
-        if (exportBtn) exportBtn.addEventListener('click', function() { self._exportData(); });
-        if (exportSelectedBtn) exportSelectedBtn.addEventListener('click', function() { self._exportSelectedData(); });
+        if (exportBtn) exportBtn.addEventListener('click', function () { self._exportData(); });
+        if (exportSelectedBtn) exportSelectedBtn.addEventListener('click', function () { self._exportSelectedData(); });
 
-        if (importBtn) importBtn.addEventListener('click', function() { importFile.click(); });
-        if (importFile) importFile.addEventListener('change', function(e) { self._importData(e); });
+        if (importBtn) importBtn.addEventListener('click', function () { importFile.click(); });
+        if (importFile) importFile.addEventListener('change', function (e) { self._importData(e); });
         if (undoBtn) {
             if (self.undo.canUndo()) undoBtn.disabled = false;
-            undoBtn.addEventListener('click', function() {
+            undoBtn.addEventListener('click', function () {
                 self.undo.undoLatest();
                 self.render();
             });
         }
         if (hideCompletedBtn) {
-            hideCompletedBtn.addEventListener('click', function() {
+            hideCompletedBtn.addEventListener('click', function () {
                 self.hideCompleted = !self.hideCompleted;
                 localStorage.setItem('gtd-hide-completed', String(self.hideCompleted));
                 self.render();
             });
         }
         if (showHiddenBtn) {
-            showHiddenBtn.addEventListener('click', function() {
+            showHiddenBtn.addEventListener('click', function () {
                 self.showHidden = !self.showHidden;
                 localStorage.setItem('gtd-show-hidden', String(self.showHidden));
                 self.render();
@@ -368,14 +376,14 @@ class BoardView {
             var clearBtn = document.createElement('button');
             clearBtn.className = 'btn-clear-completed';
             clearBtn.textContent = '🗑️ Clear All';
-            clearBtn.addEventListener('click', function() {
+            clearBtn.addEventListener('click', function () {
                 if (confirm('완료된 모든 작업을 삭제하시겠습니까?')) {
                     var completedTasks = self.ds.getTasksForStatus(TaskStatus.Completed);
-                    var snapshot = completedTasks.map(function(t) { return t.clone(); });
+                    var snapshot = completedTasks.map(function (t) { return t.clone(); });
                     self.ds.deleteAllCompleted();
                     self.undo.push({
                         desc: 'Deleted ' + snapshot.length + ' completed tasks',
-                        undo: function() { self.ds.restoreTasks(snapshot); }
+                        undo: function () { self.ds.restoreTasks(snapshot); }
                     });
                 }
             });
@@ -391,15 +399,15 @@ class BoardView {
             var topDropZone = document.createElement('div');
             topDropZone.className = 'column-drop-top';
 
-            topDropZone.addEventListener('dragover', function(e) {
+            topDropZone.addEventListener('dragover', function (e) {
                 e.preventDefault();
                 e.stopPropagation();
                 topDropZone.classList.add('drag-over-top');
             });
-            topDropZone.addEventListener('dragleave', function() {
+            topDropZone.addEventListener('dragleave', function () {
                 topDropZone.classList.remove('drag-over-top');
             });
-            topDropZone.addEventListener('drop', function(e) {
+            topDropZone.addEventListener('drop', function (e) {
                 e.preventDefault();
                 e.stopPropagation();
                 topDropZone.classList.remove('drag-over-top');
@@ -413,16 +421,16 @@ class BoardView {
         }
 
         if (!isTodayColumn && status) {
-            taskList.addEventListener('dragover', function(e) {
+            taskList.addEventListener('dragover', function (e) {
                 e.preventDefault();
                 taskList.classList.add('drag-over-column');
             });
-            taskList.addEventListener('dragleave', function(e) {
+            taskList.addEventListener('dragleave', function (e) {
                 if (!taskList.contains(e.relatedTarget)) {
                     taskList.classList.remove('drag-over-column');
                 }
             });
-            taskList.addEventListener('drop', function(e) {
+            taskList.addEventListener('drop', function (e) {
                 e.preventDefault();
                 taskList.classList.remove('drag-over-column');
                 var target = e.target;
@@ -431,7 +439,7 @@ class BoardView {
                 }
                 var ids = self.dragDrop.getIdsToMove();
                 if (ids.length > 0) {
-                    var siblings = self.ds.getRawTasks().filter(function(t) {
+                    var siblings = self.ds.getRawTasks().filter(function (t) {
                         return t.ParentId == null && t.Status === status;
                     });
                     self.ds.moveTasks(ids, status, null, siblings.length);
@@ -440,7 +448,7 @@ class BoardView {
             });
         }
 
-        filteredTasks.forEach(function(task) {
+        filteredTasks.forEach(function (task) {
             var node = self.nodeRenderer.render(task, {
                 selectedIds: self.selectedIds,
                 hideCompleted: self.hideCompleted,
@@ -456,7 +464,7 @@ class BoardView {
             var addBtn = document.createElement('button');
             addBtn.className = 'add-task-btn';
             addBtn.textContent = '+ Add Task';
-            addBtn.addEventListener('click', function() {
+            addBtn.addEventListener('click', function () {
                 self._quickAddState = { type: 'column', status: status };
                 self._attachQuickInput('column', status, null, null);
             });
@@ -468,7 +476,7 @@ class BoardView {
 
     _filterTasks(tasks) {
         var self = this;
-        return tasks.filter(function(t) {
+        return tasks.filter(function (t) {
             if (self.hideCompleted && t.IsCompleted) return false;
             if (!self.showHidden && t.IsHidden) return false;
             return true;
@@ -496,7 +504,7 @@ class BoardView {
     _showSiblingQuickAdd(task) {
         this.selectedIds.clear();
         this.isMultiSelectMode = false;
-        document.querySelectorAll('.task-node-self.is-selected, .task-node-self.is-multiselected').forEach(function(el) {
+        document.querySelectorAll('.task-node-self.is-selected, .task-node-self.is-multiselected').forEach(function (el) {
             el.classList.remove('is-selected', 'is-multiselected');
         });
         this._quickAddState = { type: 'sibling', anchorTaskId: task.Id, status: task.Status, parentId: task.ParentId };
@@ -515,8 +523,8 @@ class BoardView {
         } else if (e.shiftKey && this.lastClickedId !== null) {
             var list = this.renderedTasks;
             var lastId = this.lastClickedId;
-            var startIdx = list.findIndex(function(t) { return t.Id === lastId; });
-            var endIdx = list.findIndex(function(t) { return t.Id === task.Id; });
+            var startIdx = list.findIndex(function (t) { return t.Id === lastId; });
+            var endIdx = list.findIndex(function (t) { return t.Id === task.Id; });
             if (startIdx !== -1 && endIdx !== -1) {
                 var from = Math.min(startIdx, endIdx);
                 var to = Math.max(startIdx, endIdx);
@@ -541,7 +549,7 @@ class BoardView {
 
     _openModal(task) {
         var self = this;
-        this.modal.open(task.Id, function() {
+        this.modal.open(task.Id, function () {
             self.render();
         });
     }
@@ -549,11 +557,11 @@ class BoardView {
     _deleteTask(task) {
         var self = this;
         var snapshot = task.clone();
-        var children = this.ds.getRawTasks().filter(function(t) { return t.ParentId === task.Id; }).map(function(t) { return t.clone(); });
+        var children = this.ds.getRawTasks().filter(function (t) { return t.ParentId === task.Id; }).map(function (t) { return t.clone(); });
         this.ds.deleteTask(task.Id);
         this.undo.push({
             desc: 'Deleted "' + task.Title + '"',
-            undo: function() {
+            undo: function () {
                 self.ds.restoreTasks([snapshot].concat(children));
             }
         });
@@ -584,49 +592,49 @@ class BoardView {
             '<button class="btn-modern" id="bulk-delete-btn">🗑️ Delete</button>' +
             '<button class="btn-modern" id="bulk-cancel-btn">✖ Cancel</button>';
 
-        bar.querySelector('#bulk-export-btn').addEventListener('click', function() {
+        bar.querySelector('#bulk-export-btn').addEventListener('click', function () {
             self._exportSelectedData();
         });
 
         var editBtn = bar.querySelector('#bulk-edit-btn');
         if (editBtn) {
-            editBtn.addEventListener('click', function() {
+            editBtn.addEventListener('click', function () {
                 self.bulkPanel.show(
                     self.selectedIds,
-                    function(model) {
+                    function (model) {
                         var snapshots = [];
-                        model.taskIds.forEach(function(id) {
+                        model.taskIds.forEach(function (id) {
                             var t = self.ds.getById(id);
                             if (t) snapshots.push(t.clone());
                         });
                         self.ds.bulkUpdate(model);
                         self.undo.push({
                             desc: 'Bulk edited ' + model.taskIds.length + ' tasks',
-                            undo: function() { self.ds.restoreTasks(snapshots); }
+                            undo: function () { self.ds.restoreTasks(snapshots); }
                         });
                         self.selectedIds.clear();
                         self.render();
                     },
-                    function() { }
+                    function () { }
                 );
             });
         }
 
-        bar.querySelector('#bulk-delete-btn').addEventListener('click', function() {
+        bar.querySelector('#bulk-delete-btn').addEventListener('click', function () {
             if (confirm(self.selectedIds.size + '개 작업을 삭제하시겠습니까?')) {
                 var ids = Array.from(self.selectedIds);
-                var snapshots = ids.map(function(id) { return self.ds.getById(id); }).filter(Boolean).map(function(t) { return t.clone(); });
+                var snapshots = ids.map(function (id) { return self.ds.getById(id); }).filter(Boolean).map(function (t) { return t.clone(); });
                 self.ds.deleteTasks(ids);
                 self.undo.push({
                     desc: 'Deleted ' + ids.length + ' tasks',
-                    undo: function() { self.ds.restoreTasks(snapshots); }
+                    undo: function () { self.ds.restoreTasks(snapshots); }
                 });
                 self.selectedIds.clear();
                 self.render();
             }
         });
 
-        bar.querySelector('#bulk-cancel-btn').addEventListener('click', function() {
+        bar.querySelector('#bulk-cancel-btn').addEventListener('click', function () {
             self.selectedIds.clear();
             self.isMultiSelectMode = false;
             self.render();
@@ -638,11 +646,11 @@ class BoardView {
     _buildRenderedList() {
         var all = [];
         var self = this;
-        TaskStatusList.forEach(function(status) {
+        TaskStatusList.forEach(function (status) {
             var trees = self.ds.getTasksForStatus(status);
             var filtered = self._filterTasks(trees);
-            var flatten = function(list) {
-                list.forEach(function(t) {
+            var flatten = function (list) {
+                list.forEach(function (t) {
                     all.push(t);
                     if (t.Children && t.Children.length > 0 && t.IsExpanded) {
                         flatten(t.Children);
@@ -704,7 +712,7 @@ class BoardView {
         var file = e.target.files[0];
         if (!file) return;
         var reader = new FileReader();
-        reader.onload = function(evt) {
+        reader.onload = function (evt) {
             try {
                 self.ds.importFromJson(evt.target.result);
                 self.toast.success('데이터를 가져왔습니다');

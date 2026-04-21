@@ -36,6 +36,12 @@ class ListView {
 
         const container = document.getElementById('content-area');
         if (!container) return;
+
+        // 👈 기존 리스트의 세로 스크롤 상태 백업
+        let savedScrollTop = 0;
+        const oldList = container.querySelector('.list-view-container');
+        if (oldList) savedScrollTop = oldList.scrollTop;
+
         container.innerHTML = '';
 
         const home = document.createElement('div');
@@ -128,5 +134,12 @@ class ListView {
 
         home.appendChild(listContainer);
         container.appendChild(home);
+
+        // 👈 세로 스크롤 상태 복원 적용
+        if (savedScrollTop > 0) {
+            requestAnimationFrame(() => {
+                listContainer.scrollTop = savedScrollTop;
+            });
+        }
     }
 }
