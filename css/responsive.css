@@ -55,6 +55,8 @@
         overflow-y: auto;
         gap: var(--spacing-sm, 0.5rem);
         padding: var(--spacing-sm, 0.5rem);
+        /* ★ 마지막 칼럼이 잘리지 않도록 하단 여백 ★ */
+        padding-bottom: 120px;
     }
 
     .board-column {
@@ -121,6 +123,8 @@
         grid-template-columns: 1fr 1fr;
         gap: var(--spacing-sm, 0.5rem);
         padding: var(--spacing-sm, 0.5rem);
+        /* ★ 그리드 모드에서도 하단 여백 ★ */
+        padding-bottom: 120px;
     }
 
     .board-column {
@@ -184,6 +188,8 @@
         flex-direction: column;
         gap: 0.25rem;
         padding: 0.25rem;
+        /* ★ 소형 모바일에서도 하단 여백 ★ */
+        padding-bottom: 100px;
     }
 
     .board-column {

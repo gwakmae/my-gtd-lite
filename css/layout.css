@@ -62,7 +62,7 @@ main {
     flex-wrap: wrap;
 }
 
-/* ★ board-container: 칼럼들의 가로 스크롤 영역 ★ */
+/* ★ board-container: 칼럼들의 스크롤 영역 ★ */
 .board-container {
     display: flex;
     gap: var(--spacing-md);
@@ -240,7 +240,7 @@ main {
     background: rgba(220, 53, 69, 0.3);
 }
 
-.bulk-action-bar > .close-btn {
+.bulk-action-bar>.close-btn {
     background: none;
     border: none;
     color: rgba(255, 255, 255, 0.7);
