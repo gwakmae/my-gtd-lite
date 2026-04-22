@@ -10,8 +10,10 @@
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    padding: 60px 0;
+    padding: 60px 16px;
     box-sizing: border-box;
+    -webkit-overflow-scrolling: touch;
+    isolation: isolate;
 }
 
 .modal-container {
@@ -23,6 +25,7 @@
     z-index: 2001;
     flex-shrink: 0;
     animation: modalSlideIn 0.3s ease-out;
+    position: relative;
 }
 
 .modal-header {
@@ -171,6 +174,7 @@
     background-color: #f8f9fa;
     border-radius: 6px;
     border: 1px solid #e9ecef;
+    min-height: 44px;
 }
 
 .context-tag {
@@ -351,4 +355,21 @@
     gap: 0.5rem;
     padding: 0.75rem 1rem;
     border-top: 1px solid #eee;
+}
+
+/* ★ 모바일 모달 최적화 ★ */
+@media (max-width: 1199.98px) {
+    .modal-backdrop {
+        padding: 16px;
+        align-items: flex-start;
+    }
+
+    .modal-container {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    .date-group {
+        grid-template-columns: 1fr;
+    }
 }

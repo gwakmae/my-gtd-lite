@@ -4,6 +4,7 @@ class TaskModal {
         this._onSave = null;
         this._backdropEl = null;
         this._mouseDownInsideModal = false;
+        this._bodyScrollY = 0;
     }
 
     open(taskId, onSave) {
@@ -68,20 +69,26 @@ class TaskModal {
         const allContexts = this.ds.getAllContexts();
         const ctxTags = document.createElement('div');
         ctxTags.className = 'context-tags';
-        for (const ctx of allContexts) {
-            const tag = document.createElement('button');
-            tag.type = 'button';
-            tag.className = `context-tag ${local.Contexts.includes(ctx) ? 'selected' : ''}`;
-            tag.innerHTML = `${ctx} <span>${local.Contexts.includes(ctx) ? '✔' : '○'}</span>`;
-            tag.addEventListener('click', () => {
-                const idx = local.Contexts.indexOf(ctx);
-                if (idx >= 0) local.Contexts.splice(idx, 1);
-                else local.Contexts.push(ctx);
+
+        if (allContexts.length === 0) {
+            // ★ 컨텍스트가 없을 때 안내 문구 ★
+            ctxTags.innerHTML = '<span style="color:#aaa;font-size:0.85rem;padding:4px;">아직 컨텍스트가 없습니다. 아래에서 추가하세요.</span>';
+        } else {
+            for (const ctx of allContexts) {
+                const tag = document.createElement('button');
+                tag.type = 'button';
                 tag.className = `context-tag ${local.Contexts.includes(ctx) ? 'selected' : ''}`;
                 tag.innerHTML = `${ctx} <span>${local.Contexts.includes(ctx) ? '✔' : '○'}</span>`;
-                this._updateSelectedContexts(body, local);
-            });
-            ctxTags.appendChild(tag);
+                tag.addEventListener('click', () => {
+                    const idx = local.Contexts.indexOf(ctx);
+                    if (idx >= 0) local.Contexts.splice(idx, 1);
+                    else local.Contexts.push(ctx);
+                    tag.className = `context-tag ${local.Contexts.includes(ctx) ? 'selected' : ''}`;
+                    tag.innerHTML = `${ctx} <span>${local.Contexts.includes(ctx) ? '✔' : '○'}</span>`;
+                    this._updateSelectedContexts(body, local);
+                });
+                ctxTags.appendChild(tag);
+            }
         }
         ctxGroup.appendChild(ctxTags);
 
@@ -141,22 +148,29 @@ class TaskModal {
         });
 
         document.addEventListener('mouseup', this._onGlobalMouseUp = () => {
-            // mouseup 후 다음 tick에서 리셋 (click 이벤트가 먼저 처리되도록)
             setTimeout(() => {
                 this._mouseDownInsideModal = false;
             }, 0);
         });
 
         this._backdropEl.addEventListener('click', (e) => {
-            // 바깥 클릭으로 닫기: backdrop 자체를 클릭했고, 데스크탑이며, 
-            // mousedown이 모달 내부에서 시작되지 않은 경우에만 닫기
             if (e.target === this._backdropEl && window.innerWidth >= 768 && !this._mouseDownInsideModal) {
                 this.close();
             }
         });
 
         document.body.appendChild(this._backdropEl);
-        document.body.style.overflow = 'hidden';
+
+        // ★ 모바일: body 스크롤 고정 + 위치 보정 ★
+        if (window.innerWidth < 768) {
+            const scrollY = window.scrollY || window.pageYOffset || 0;
+            document.body.style.position = 'fixed';
+            document.body.style.top = '-' + scrollY + 'px';
+            document.body.style.width = '100%';
+            this._bodyScrollY = scrollY;
+        } else {
+            document.body.style.overflow = 'hidden';
+        }
 
         // ★ Ctrl+Enter로 Save Changes ★
         this._onKeyDown = (e) => {
@@ -230,7 +244,6 @@ class TaskModal {
     }
 
     close() {
-        // ★ 이벤트 리스너 정리 ★
         if (this._onGlobalMouseUp) {
             document.removeEventListener('mouseup', this._onGlobalMouseUp);
             this._onGlobalMouseUp = null;
@@ -238,6 +251,15 @@ class TaskModal {
         if (this._backdropEl) {
             this._backdropEl.remove();
             this._backdropEl = null;
+        }
+        // ★ 모바일 body fixed 해제 + 스크롤 위치 복원 ★
+        if (document.body.style.position === 'fixed') {
+            const scrollY = this._bodyScrollY || 0;
+            document.body.style.position = '';
+            document.body.style.top = '';
+            document.body.style.width = '';
+            window.scrollTo(0, scrollY);
+            this._bodyScrollY = 0;
         }
         document.body.style.overflow = '';
     }
