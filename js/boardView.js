@@ -14,11 +14,11 @@ class BoardView {
         this.showHidden = localStorage.getItem('gtd-show-hidden') === 'true';
 
         this._savedScrollLeft = 0;
-        this._savedScrollTop = 0; // 👈 세로 스크롤 저장용 변수 추가
+        this._savedScrollTop = 0;
 
         // ★★★ 연속 입력 상태 ★★★
         this._quickAddState = null;
-        this._quickAddId = 0; // 입력창 고유 ID (stale blur 방지)
+        this._quickAddId = 0;
 
         var self = this;
 
@@ -77,7 +77,7 @@ class BoardView {
         var oldBoard = container.querySelector('.board-container');
         if (oldBoard) {
             this._savedScrollLeft = oldBoard.scrollLeft;
-            this._savedScrollTop = oldBoard.scrollTop; // 👈 세로 스크롤 상태 백업
+            this._savedScrollTop = oldBoard.scrollTop;
         }
 
         container.innerHTML = '';
@@ -107,7 +107,7 @@ class BoardView {
         if (savedScrollX > 0 || savedScrollY > 0) {
             requestAnimationFrame(function () {
                 if (savedScrollX > 0) boardContainer.scrollLeft = savedScrollX;
-                if (savedScrollY > 0) boardContainer.scrollTop = savedScrollY; // 👈 세로 스크롤 상태 복원
+                if (savedScrollY > 0) boardContainer.scrollTop = savedScrollY;
             });
         }
 
@@ -176,7 +176,6 @@ class BoardView {
                 if (allNodes2[j].dataset.taskId === String(anchorTaskId)) { anchorEl = allNodes2[j]; break; }
             }
             if (!anchorEl) {
-                // anchor 못 찾으면 같은 그룹 마지막 태스크
                 var siblings = this.ds.getRawTasks().filter(function (t) {
                     return t.ParentId === parentId && t.Status === status;
                 }).sort(function (a, b) { return a.SortOrder - b.SortOrder; });
@@ -194,14 +193,14 @@ class BoardView {
         // 스크롤 보정 & 포커스
         var boardContainer = container.closest('.board-container');
         var savedScrollLeft = boardContainer ? boardContainer.scrollLeft : 0;
-        var savedScrollTop = boardContainer ? boardContainer.scrollTop : 0; // 👈 세로 스크롤 상태 백업
+        var savedScrollTop = boardContainer ? boardContainer.scrollTop : 0;
 
         input.focus();
 
         if (boardContainer) {
             requestAnimationFrame(function () {
                 boardContainer.scrollLeft = savedScrollLeft;
-                boardContainer.scrollTop = savedScrollTop; // 👈 세로 스크롤 상태 복원
+                boardContainer.scrollTop = savedScrollTop;
             });
         }
 
@@ -223,16 +222,11 @@ class BoardView {
                         newTask = self.ds.addTask(val, status, parentId);
                     } else if (type === 'sibling') {
                         newTask = self.ds.addTask(val, status, parentId);
-                        // anchor 갱신
                         if (newTask && self._quickAddState) {
                             self._quickAddState.anchorTaskId = newTask.Id;
                         }
                     }
-                    // addTask → _notify → render → _quickAddState로 입력창 자동 복원
-                    // 이 시점에서 이 input은 이미 DOM에서 제거됨 (render가 innerHTML='' 함)
-                    // blur가 발생하지만 myId가 stale이므로 무시됨
                 } else {
-                    // 빈 Enter → 종료
                     self._quickAddState = null;
                     if (container.parentNode) container.remove();
                     if (addBtn) addBtn.style.display = '';
@@ -246,12 +240,9 @@ class BoardView {
             }
         });
 
-        // blur: stale 입력창만 처리 (render에 의해 DOM에서 떨어진 경우 무시)
         input.addEventListener('blur', function () {
             setTimeout(function () {
-                // 이미 다음 세대 입력창이 열렸으면 이 blur는 무시
                 if (self._quickAddId !== myId) return;
-                // 아직 이 입력창이 현역인데 blur됨 = 사용자가 다른 곳 클릭
                 var val = input.value.trim();
                 if (val) {
                     if (type === 'column') {
@@ -263,7 +254,6 @@ class BoardView {
                 self._quickAddState = null;
                 if (container.parentNode) container.remove();
                 if (addBtn) addBtn.style.display = '';
-                // addTask이 이미 render를 트리거했으므로 val이 있으면 추가 render 불필요
                 if (!val) self.render();
             }, 150);
         });
@@ -303,7 +293,7 @@ class BoardView {
         actions.innerHTML =
             '<button class="btn-modern" id="btn-export" title="Export All (전체 백업)">📥 Export All</button>' +
             (hasSelection
-                ? '<button class="btn-modern btn-export-selected" id="btn-export-selected" title="Export Selected Tasks">📋 Export Selected (' + this.selectedIds.size + ')</button>'
+                ? '<button class="btn-modern btn-export-selected header-only-desktop" id="btn-export-selected" title="Export Selected Tasks">📋 Export Selected (' + this.selectedIds.size + ')</button>'
                 : '') +
             '<button class="btn-modern" id="btn-import" title="Import">📤 Import</button>' +
             '<input type="file" id="import-file" accept=".json" style="display:none">' +

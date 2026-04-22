@@ -104,6 +104,11 @@
     .action-btn.add-btn:active {
         color: var(--primary-color, #3b82f6);
     }
+
+    /* ★ 모바일에서 헤더의 Export Selected 숨김 (bulk bar에서 제공) ★ */
+    .header-only-desktop {
+        display: none !important;
+    }
 }
 
 /* ─────────────────────────────
