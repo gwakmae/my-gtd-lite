@@ -57,6 +57,13 @@ const app = {
         return /KAKAOTALK|NAVER|Line|Instagram|FB_IAB|FBAN|Twitter/i.test(ua);
     },
 
+    // ★ 자동 리다이렉트 폴백 시 에러를 보여줄 필요 없는 코드 목록 ★
+    _silentAuthErrors: [
+        'auth/cancelled-popup-request',
+        'auth/popup-blocked',
+        'auth/popup-closed-by-user'
+    ],
+
     _setupFirebaseAuth() {
         var fb = window._firebase;
         if (!fb) return;
@@ -91,26 +98,34 @@ const app = {
                         await fb.auth.signInWithPopup(fb.provider);
                     }
                 } catch (e) {
-                    console.error('[Auth] Login error:', e);
-                    if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
+                    console.warn('[Auth] Popup error:', e.code, e.message);
+
+                    // ★ 팝업 관련 에러 → 조용히 리다이렉트로 전환 ★
+                    if (this._silentAuthErrors.includes(e.code)) {
                         try {
                             await fb.auth.signInWithRedirect(fb.provider);
                         } catch (e2) {
+                            console.error('[Auth] Redirect also failed:', e2);
                             this.toast.error('로그인 실패: ' + e2.message);
                         }
-                    } else {
-                        this.toast.error('로그인 실패: ' + e.message);
+                        return;
                     }
+
+                    // 그 외 에러만 사용자에게 표시
+                    this.toast.error('로그인 실패: ' + e.message);
                 }
             });
         }
 
-        fb.auth.getRedirectResult().then(function(result) {
+        fb.auth.getRedirectResult().then(function (result) {
+            // 리다이렉트 성공 시 onAuthStateChanged에서 처리됨
         }).catch((e) => {
-            if (e.code && e.code !== 'auth/no-auth-event') {
-                console.error('[Auth] Redirect error:', e);
-                this.toast.error('로그인 실패: ' + e.message);
+            // ★ 무해한 에러는 무시 ★
+            if (!e.code || e.code === 'auth/no-auth-event' || this._silentAuthErrors.includes(e.code)) {
+                return;
             }
+            console.error('[Auth] Redirect error:', e);
+            this.toast.error('로그인 실패: ' + e.message);
         });
     },
 
@@ -180,7 +195,7 @@ const app = {
 
         nav.innerHTML = html;
 
-        nav.querySelectorAll('[data-route]').forEach(function(btn) {
+        nav.querySelectorAll('[data-route]').forEach(function (btn) {
             btn.addEventListener('click', () => {
                 app.navigate(btn.dataset.route, btn.dataset.context);
             });
@@ -265,7 +280,7 @@ const app = {
         if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
             if (this.currentRoute === 'board') {
                 e.preventDefault();
-                this.boardView.renderedTasks.forEach(function(t) {
+                this.boardView.renderedTasks.forEach(function (t) {
                     app.boardView.selectedIds.add(t.Id);
                 });
                 this.boardView.render();
