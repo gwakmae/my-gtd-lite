@@ -4,15 +4,18 @@
     left: 0;
     width: 100%;
     height: 100%;
+    /* ★ 모바일 뷰포트 높이 보정 ★ */
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
     background-color: rgba(0, 0, 0, 0.5);
     z-index: 2000;
-    overflow-y: auto;
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    padding: 60px 16px;
-    box-sizing: border-box;
+    overflow-y: auto;
     -webkit-overflow-scrolling: touch;
+    padding: 20px 16px 40px 16px;
+    box-sizing: border-box;
     isolation: isolate;
 }
 
@@ -20,12 +23,14 @@
     background-color: #ffffff;
     border-radius: 12px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-    width: 90%;
+    width: 100%;
     max-width: 550px;
     z-index: 2001;
-    flex-shrink: 0;
-    animation: modalSlideIn 0.3s ease-out;
     position: relative;
+    flex-shrink: 0;
+    /* ★ 잘림 방지: 높이 제한 없음, 내용만큼 늘어남 ★ */
+    height: auto;
+    animation: modalSlideIn 0.3s ease-out;
 }
 
 .modal-header {
@@ -226,6 +231,7 @@
     border-radius: var(--radius-md);
     font-weight: 600;
     white-space: nowrap;
+    cursor: pointer;
 }
 
 .new-context-input .btn-add-context:disabled {
@@ -357,10 +363,10 @@
     border-top: 1px solid #eee;
 }
 
-/* ★ 모바일 모달 최적화 ★ */
+/* ★ 모바일 최적화 ★ */
 @media (max-width: 1199.98px) {
     .modal-backdrop {
-        padding: 16px;
+        padding: 16px 12px 60px 12px;
         align-items: flex-start;
     }
 
@@ -369,6 +375,7 @@
         max-width: 100%;
     }
 
+    /* 날짜 1열로 */
     .date-group {
         grid-template-columns: 1fr;
     }
