@@ -1,12 +1,9 @@
-/* css/modal.css */
-
 .modal-backdrop {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    /* ★ 모바일 뷰포트 높이 보정 ★ */
     min-height: 100vh;
     min-height: -webkit-fill-available;
     background-color: rgba(0, 0, 0, 0.5);
@@ -30,7 +27,6 @@
     z-index: 2001;
     position: relative;
     flex-shrink: 0;
-    /* ★ 핵심 수정: 내용에 맞게 줄어들도록 ★ */
     height: auto;
     display: flex;
     flex-direction: column;
@@ -65,7 +61,6 @@
 
 .modal-body {
     padding: 1.5rem;
-    /* ★ 핵심 수정: body가 필요한 만큼만 차지 ★ */
     flex: 0 1 auto;
     overflow-y: auto;
 }
@@ -74,7 +69,6 @@
     margin-bottom: 1.25rem;
 }
 
-/* ★ 마지막 form-group의 하단 마진 제거 ★ */
 .modal-body .form-group:last-child,
 .modal-body .form-check:last-child,
 .modal-body>*:last-child {
@@ -379,16 +373,48 @@
     border-top: 1px solid #eee;
 }
 
-/* ★ 모바일 최적화 ★ */
+/* ★★★ 모바일 최적화 ★★★ */
 @media (max-width: 1199.98px) {
     .modal-backdrop {
-        padding: 16px 12px 60px 12px;
-        align-items: flex-start;
+        padding: 0;
+        align-items: stretch;
+        overflow: hidden;
     }
 
     .modal-container {
         width: 100%;
         max-width: 100%;
+        max-height: 100%;
+        border-radius: 0;
+        /* ★ 화면 전체를 채우되, flex-column으로 내부 스크롤 ★ */
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .modal-header {
+        padding: 0.75rem 1rem;
+        flex-shrink: 0;
+    }
+
+    .modal-header h3 {
+        font-size: 1.1rem;
+    }
+
+    .modal-body {
+        padding: 1rem;
+        /* ★ 핵심: body만 스크롤, header/footer는 고정 ★ */
+        flex: 1 1 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        min-height: 0;
+    }
+
+    .modal-footer {
+        border-radius: 0;
+        flex-shrink: 0;
+        /* ★ iOS safe area 대응 ★ */
+        padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
     }
 
     /* 날짜 1열로 */

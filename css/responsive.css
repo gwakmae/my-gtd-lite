@@ -291,18 +291,6 @@
         padding: 0.4rem 0.6rem;
     }
 
-    /* 모달 */
-    .modal-container {
-        width: 95vw;
-        max-height: 85vh;
-        margin: 0.5rem;
-    }
-
-    /* 날짜 그리드 */
-    .date-group {
-        grid-template-columns: 1fr;
-    }
-
     /* ★ 소형 모바일: 버튼 더 작게 ★ */
     .action-btn.delete-btn {
         font-size: 1rem;
@@ -350,6 +338,7 @@
    5. 접근성: 모션 줄이기
    ───────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
+
     .sidebar,
     .sidebar-overlay {
         transition: none;
