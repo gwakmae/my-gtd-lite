@@ -1,8 +1,9 @@
 {
+  "id": "/my-gtd-lite/",
   "name": "GTD Board",
   "short_name": "GTD",
   "description": "나만의 GTD 보드 앱",
-  "start_url": "/my-gtd-lite/",
+  "start_url": "/my-gtd-lite/?source=pwa",
   "scope": "/my-gtd-lite/",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -10,19 +11,19 @@
   "orientation": "any",
   "icons": [
     {
-      "src": "icons/icon-192.png",
+      "src": "/my-gtd-lite/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icons/icon-512.png",
+      "src": "/my-gtd-lite/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "icons/icon.svg",
+      "src": "/my-gtd-lite/icons/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
