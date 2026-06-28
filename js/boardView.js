@@ -20,6 +20,9 @@ class BoardView {
         this._quickAddState = null;
         this._quickAddId = 0;
 
+        // ★ task-list 세로 스크롤 보존용 ★
+        this._savedTaskListScrolls = {};
+
         var self = this;
 
         this.nodeRenderer = new TaskNodeRenderer(dataService, {
@@ -74,10 +77,23 @@ class BoardView {
         var container = document.getElementById('content-area');
         if (!container) return;
 
+        // ★★★ board-container 스크롤 + 각 task-list 세로 스크롤 저장 ★★★
+        this._savedTaskListScrolls = {};
         var oldBoard = container.querySelector('.board-container');
         if (oldBoard) {
             this._savedScrollLeft = oldBoard.scrollLeft;
             this._savedScrollTop = oldBoard.scrollTop;
+
+            var oldTaskLists = oldBoard.querySelectorAll('.task-list');
+            for (var i = 0; i < oldTaskLists.length; i++) {
+                var tl = oldTaskLists[i];
+                if (tl.scrollTop > 0) {
+                    var col = tl.closest('.board-column');
+                    // today 칼럼은 data-status가 없으므로 __today__ 키 사용
+                    var key = col ? (col.dataset.status || '__today__') : ('__tl_' + i + '__');
+                    this._savedTaskListScrolls[key] = tl.scrollTop;
+                }
+            }
         }
 
         container.innerHTML = '';
@@ -102,12 +118,27 @@ class BoardView {
 
         container.appendChild(boardContainer);
 
+        // ★★★ board-container 스크롤 + 각 task-list 세로 스크롤 복원 ★★★
         var savedScrollX = this._savedScrollLeft;
         var savedScrollY = this._savedScrollTop;
-        if (savedScrollX > 0 || savedScrollY > 0) {
+        var savedTaskListScrolls = this._savedTaskListScrolls;
+        var hasTaskListScrolls = savedTaskListScrolls && Object.keys(savedTaskListScrolls).length > 0;
+        if (savedScrollX > 0 || savedScrollY > 0 || hasTaskListScrolls) {
             requestAnimationFrame(function () {
                 if (savedScrollX > 0) boardContainer.scrollLeft = savedScrollX;
                 if (savedScrollY > 0) boardContainer.scrollTop = savedScrollY;
+                // 각 task-list 세로 스크롤 복원
+                if (hasTaskListScrolls) {
+                    var newTaskLists = boardContainer.querySelectorAll('.task-list');
+                    for (var i = 0; i < newTaskLists.length; i++) {
+                        var tl = newTaskLists[i];
+                        var col = tl.closest('.board-column');
+                        var key = col ? (col.dataset.status || '__today__') : ('__tl_' + i + '__');
+                        if (savedTaskListScrolls[key] !== undefined) {
+                            tl.scrollTop = savedTaskListScrolls[key];
+                        }
+                    }
+                }
             });
         }
 
@@ -117,7 +148,7 @@ class BoardView {
         this.dragDrop.setSelectedIds(this.selectedIds);
         this.renderedTasks = this._buildRenderedList();
 
-        // ★★★ 연속 입력 중이었으면 입력창 자동 복원 ★★★
+        // ★★★ 연속 입력 중이었으면 입력창 복원 ★★★
         if (this._quickAddState) {
             var st = this._quickAddState;
             if (st.type === 'column') {
@@ -130,7 +161,7 @@ class BoardView {
         }
     }
 
-    // ★★★ 통합된 입력창 생성/부착 메서드 ★★★
+    // ★★★ 통합 입력창 생성/부착 메서드 ★★★
     _attachQuickInput(type, status, parentId, anchorTaskId) {
         var self = this;
         var container = document.createElement('div');
@@ -473,7 +504,7 @@ class BoardView {
         });
     }
 
-    // ★★★ 기존 진입점들 — _attachQuickInput으로 위임 ★★★
+    // 기존 진입점들 → _attachQuickInput으로 위임
     _showQuickAdd(column, status, addBtn) {
         this._quickAddState = { type: 'column', status: status };
         this._attachQuickInput('column', status, null, null);
