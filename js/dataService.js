@@ -10,6 +10,8 @@ class DataService {
         this._syncStatus = document.getElementById('sync-status');
         this._offlineBadge = document.getElementById('offline-badge');
         this._isSyncing = false;
+        // ★ 중복 추가 차단용 마지막 추가 기록
+        this._lastAdd = null;
     }
 
     onChange(fn) { this._listeners.push(fn); }
@@ -248,10 +250,22 @@ class DataService {
     }
 
     addTask(title, status, parentId) {
+        // ★ 안전망: 0.5초 내 동일 작업 중복 추가 차단 (Enter 저장 후 blur 재저장 등 이중 호출 경로의 최종 방어선)
+        var now = Date.now();
+        if (this._lastAdd &&
+            this._lastAdd.title === title &&
+            this._lastAdd.status === status &&
+            this._lastAdd.parentId === parentId &&
+            (now - this._lastAdd.time) < 500) {
+            console.warn('[GTD] 중복 추가 차단됨:', title);
+            return this.getById(this._lastAdd.id);
+        }
+
         var siblings = this._tasks.filter(function(t) { return t.ParentId === parentId && t.Status === status; });
         var maxSort = siblings.length > 0 ? Math.max.apply(null, siblings.map(function(s) { return s.SortOrder; })) : -1;
         var task = new TaskItem({ Id: this._nextId++, Title: title, Status: status, ParentId: parentId, SortOrder: maxSort + 1 });
         this._tasks.push(task);
+        this._lastAdd = { title: title, status: status, parentId: parentId, time: now, id: task.Id };
         this._saveAndNotify();
         return task;
     }

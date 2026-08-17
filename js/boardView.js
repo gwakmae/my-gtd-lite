@@ -1,3 +1,7 @@
+// build: v15 — Enter 이중 저장 이중 방어 (finished 선설정 + value 선삭제 + isConnected 가드)
+window.__GTD_BUILD = 'v15';
+console.log('[GTD] boardView build v15 loaded');
+
 class BoardView {
     constructor(dataService, undoService, toastService) {
         this.ds = dataService;
@@ -211,42 +215,42 @@ class BoardView {
         // 상태 기록
         self._quickAddState = { type: type, status: status, parentId: parentId, anchorTaskId: anchorTaskId };
 
-        // ★★★ 처리 완료 플래그: Enter/Escape로 이미 처리된 입력창은 blur가 다시 저장하지 못하게 차단 ★★★
+        // ★★★ 처리 완료 플래그 (1차 방어) ★★★
         var finished = false;
 
         input.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
-                // ★ 한글 IME 조합 완료용 Enter는 무시 (조합 중 Enter가 저장으로 이어지는 것 방지)
+                // 한글 IME 조합 완료용 Enter는 무시
                 if (e.isComposing) return;
                 e.preventDefault();
+                // ★ 이미 처리된 Enter가 어떤 경로로든 다시 오면 무시 (키 반복/중복 이벤트 방어)
+                if (finished) return;
+                // ★★★ 1차 방어: 저장하기 "전에" 완료 표시 + 값 비우기 ★★★
+                // addTask → render → 이 입력창 제거 → blur 자동 발생 순서로 이어지므로,
+                // 미리 처리해두면 뒤따라오는 blur가 저장할 값 자체를 못 읽음
+                finished = true;
                 var val = input.value.trim();
+                input.value = '';
                 if (val) {
-                    var newTask;
                     if (type === 'column') {
-                        newTask = self.ds.addTask(val, status, null);
+                        self.ds.addTask(val, status, null);
                     } else if (type === 'child') {
-                        newTask = self.ds.addTask(val, status, parentId);
+                        self.ds.addTask(val, status, parentId);
                     } else if (type === 'sibling') {
-                        newTask = self.ds.addTask(val, status, parentId);
+                        var newTask = self.ds.addTask(val, status, parentId);
                         if (newTask && self._quickAddState) {
                             self._quickAddState.anchorTaskId = newTask.Id;
                         }
+                        self.render(); // 입력창이 새 항목 아래에 오도록 재정렬
                     }
-                    // ★★★ 핵심 수정: Enter로 이미 저장했으므로 blur 이중 저장 차단 ★★★
-                    // (addTask → render → 이 입력창이 DOM에서 제거되며 blur 자동 발생 → 150ms 뒤 재저장되던 버그)
-                    finished = true;
-                    input.value = '';
-                    if (type === 'sibling') self.render(); // 입력창이 새 항목 아래에 오도록 재정렬
                 } else {
-                    finished = true;
                     self._quickAddState = null;
                     if (container.parentNode) container.remove();
                     if (addBtn) addBtn.style.display = '';
                     self.render();
                 }
             } else if (e.key === 'Escape') {
-                // ★ Escape도 finished 처리 — 안 그러면 제거 시 blur가 발생해 입력 중이던 값이 저장됨
-                finished = true;
+                finished = true; // Escape 했는데 blur가 값을 저장하는 것 방지
                 self._quickAddState = null;
                 if (container.parentNode) container.remove();
                 if (addBtn) addBtn.style.display = '';
@@ -256,8 +260,10 @@ class BoardView {
 
         input.addEventListener('blur', function () {
             setTimeout(function () {
-                // ★ Enter/Escape로 이미 처리된 경우 아무것도 하지 않음 (이중 저장 버그 수정)
+                // ★ 1차 방어: Enter/Escape로 이미 처리됨
                 if (finished) return;
+                // ★★★ 2차 방어: render 등으로 입력창이 문서에서 제거된 상태면 아무것도 하지 않음 ★★★
+                if (!container.isConnected) return;
 
                 if (self._quickAddId !== myId) {
                     // 다른 입력창으로 대체된 경우: 입력값은 저장하고 내 DOM만 정리
