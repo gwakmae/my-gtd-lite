@@ -20,9 +20,6 @@ class BoardView {
         this._quickAddState = null;
         this._quickAddId = 0;
 
-        // ★ task-list 세로 스크롤 보존용 ★
-        this._savedTaskListScrolls = {};
-
         var self = this;
 
         this.nodeRenderer = new TaskNodeRenderer(dataService, {
@@ -77,23 +74,10 @@ class BoardView {
         var container = document.getElementById('content-area');
         if (!container) return;
 
-        // ★★★ board-container 스크롤 + 각 task-list 세로 스크롤 저장 ★★★
-        this._savedTaskListScrolls = {};
         var oldBoard = container.querySelector('.board-container');
         if (oldBoard) {
             this._savedScrollLeft = oldBoard.scrollLeft;
             this._savedScrollTop = oldBoard.scrollTop;
-
-            var oldTaskLists = oldBoard.querySelectorAll('.task-list');
-            for (var i = 0; i < oldTaskLists.length; i++) {
-                var tl = oldTaskLists[i];
-                if (tl.scrollTop > 0) {
-                    var col = tl.closest('.board-column');
-                    // today 칼럼은 data-status가 없으므로 __today__ 키 사용
-                    var key = col ? (col.dataset.status || '__today__') : ('__tl_' + i + '__');
-                    this._savedTaskListScrolls[key] = tl.scrollTop;
-                }
-            }
         }
 
         container.innerHTML = '';
@@ -118,27 +102,12 @@ class BoardView {
 
         container.appendChild(boardContainer);
 
-        // ★★★ board-container 스크롤 + 각 task-list 세로 스크롤 복원 ★★★
         var savedScrollX = this._savedScrollLeft;
         var savedScrollY = this._savedScrollTop;
-        var savedTaskListScrolls = this._savedTaskListScrolls;
-        var hasTaskListScrolls = savedTaskListScrolls && Object.keys(savedTaskListScrolls).length > 0;
-        if (savedScrollX > 0 || savedScrollY > 0 || hasTaskListScrolls) {
+        if (savedScrollX > 0 || savedScrollY > 0) {
             requestAnimationFrame(function () {
                 if (savedScrollX > 0) boardContainer.scrollLeft = savedScrollX;
                 if (savedScrollY > 0) boardContainer.scrollTop = savedScrollY;
-                // 각 task-list 세로 스크롤 복원
-                if (hasTaskListScrolls) {
-                    var newTaskLists = boardContainer.querySelectorAll('.task-list');
-                    for (var i = 0; i < newTaskLists.length; i++) {
-                        var tl = newTaskLists[i];
-                        var col = tl.closest('.board-column');
-                        var key = col ? (col.dataset.status || '__today__') : ('__tl_' + i + '__');
-                        if (savedTaskListScrolls[key] !== undefined) {
-                            tl.scrollTop = savedTaskListScrolls[key];
-                        }
-                    }
-                }
             });
         }
 
@@ -148,10 +117,10 @@ class BoardView {
         this.dragDrop.setSelectedIds(this.selectedIds);
         this.renderedTasks = this._buildRenderedList();
 
-        // ★★★ 연속 입력 중이었으면 입력창 복원 ★★★
+        // ★★★ 연속 입력 중이었으면 입력창 자동 복원 ★★★
         if (this._quickAddState) {
             var st = this._quickAddState;
-            this._quickAddState = null; // ★ 추가: 복원 실패 시 상태가 남아 매 렌더링마다 재시도하는 것 방지
+            this._quickAddState = null; // 복원 실패 시 상태가 남아 매 렌더링마다 재시도하는 것 방지
             if (st.type === 'column') {
                 this._attachQuickInput('column', st.status, null, null);
             } else if (st.type === 'child') {
@@ -162,7 +131,7 @@ class BoardView {
         }
     }
 
-    // ★★★ 통합 입력창 생성/부착 메서드 ★★★
+    // ★★★ 통합된 입력창 생성/부착 메서드 ★★★
     _attachQuickInput(type, status, parentId, anchorTaskId) {
         var self = this;
         var container = document.createElement('div');
@@ -242,8 +211,13 @@ class BoardView {
         // 상태 기록
         self._quickAddState = { type: type, status: status, parentId: parentId, anchorTaskId: anchorTaskId };
 
+        // ★★★ 처리 완료 플래그: Enter/Escape로 이미 처리된 입력창은 blur가 다시 저장하지 못하게 차단 ★★★
+        var finished = false;
+
         input.addEventListener('keydown', function (e) {
             if (e.key === 'Enter') {
+                // ★ 한글 IME 조합 완료용 Enter는 무시 (조합 중 Enter가 저장으로 이어지는 것 방지)
+                if (e.isComposing) return;
                 e.preventDefault();
                 var val = input.value.trim();
                 if (val) {
@@ -256,16 +230,23 @@ class BoardView {
                         newTask = self.ds.addTask(val, status, parentId);
                         if (newTask && self._quickAddState) {
                             self._quickAddState.anchorTaskId = newTask.Id;
-                            self.render(); // ★ 추가: 입력창이 새 항목 아래에 오도록 재정렬
                         }
                     }
+                    // ★★★ 핵심 수정: Enter로 이미 저장했으므로 blur 이중 저장 차단 ★★★
+                    // (addTask → render → 이 입력창이 DOM에서 제거되며 blur 자동 발생 → 150ms 뒤 재저장되던 버그)
+                    finished = true;
+                    input.value = '';
+                    if (type === 'sibling') self.render(); // 입력창이 새 항목 아래에 오도록 재정렬
                 } else {
+                    finished = true;
                     self._quickAddState = null;
                     if (container.parentNode) container.remove();
                     if (addBtn) addBtn.style.display = '';
                     self.render();
                 }
             } else if (e.key === 'Escape') {
+                // ★ Escape도 finished 처리 — 안 그러면 제거 시 blur가 발생해 입력 중이던 값이 저장됨
+                finished = true;
                 self._quickAddState = null;
                 if (container.parentNode) container.remove();
                 if (addBtn) addBtn.style.display = '';
@@ -275,8 +256,11 @@ class BoardView {
 
         input.addEventListener('blur', function () {
             setTimeout(function () {
+                // ★ Enter/Escape로 이미 처리된 경우 아무것도 하지 않음 (이중 저장 버그 수정)
+                if (finished) return;
+
                 if (self._quickAddId !== myId) {
-                    // ★ 수정: 다른 입력창으로 대체된 경우 — 입력값은 저장하고 내 DOM만 정리 (기존: 그냥 리턴해서 값 유실 + DOM 잔류)
+                    // 다른 입력창으로 대체된 경우: 입력값은 저장하고 내 DOM만 정리
                     var v0 = input.value.trim();
                     if (container.parentNode) container.remove();
                     if (addBtn) addBtn.style.display = '';
@@ -516,7 +500,7 @@ class BoardView {
         });
     }
 
-    // 기존 진입점들 → _attachQuickInput으로 위임
+    // ★★★ 기존 진입점들 — _attachQuickInput으로 위임 ★★★
     _showQuickAdd(column, status, addBtn) {
         this._quickAddState = { type: 'column', status: status };
         this._attachQuickInput('column', status, null, null);
