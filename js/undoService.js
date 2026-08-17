@@ -10,6 +10,7 @@ class UndoService {
     _notify() { this._listeners.forEach(fn => fn()); }
 
     push(action) {
+        action.description = action.description || action.desc || ''; // ★ 추가: desc/description 속성명 불일치 통일 (스낵바 "undefined" 방지)
         this._stack.unshift(action);
         if (this._stack.length > this._capacity) this._stack.pop();
         this._notify();

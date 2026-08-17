@@ -17,6 +17,7 @@ class TaskNodeRenderer {
 
         this._boundTouchMove = this._onTouchMove.bind(this);
         this._boundTouchEnd = this._onTouchEnd.bind(this);
+        this._boundTouchCancel = this._onTouchCancel.bind(this); // ★ 추가: touchcancel 바인딩
     }
 
     render(task, opts) {
@@ -191,6 +192,7 @@ class TaskNodeRenderer {
 
             document.addEventListener('touchmove', self._boundTouchMove, { passive: false });
             document.addEventListener('touchend', self._boundTouchEnd);
+            document.addEventListener('touchcancel', self._boundTouchCancel); // ★ 추가
             selfEl.addEventListener('contextmenu', self._preventContext);
         }, { passive: true });
 
@@ -326,10 +328,29 @@ class TaskNodeRenderer {
         }
     }
 
+    // ★ 추가: OS가 터치를 가로챈 경우 touchend가 오지 않으므로 여기서 전부 정리 ★
+    _onTouchCancel() {
+        var ts = this._touchState;
+        if (ts.longPressTimer) { clearTimeout(ts.longPressTimer); ts.longPressTimer = null; }
+        this._clearHoldTimer();
+        if (ts.ghostEl) { ts.ghostEl.remove(); ts.ghostEl = null; }
+        if (ts.sourceEl) {
+            ts.sourceEl.classList.remove('is-dragging-source');
+            ts.sourceEl.draggable = true;
+            ts.sourceEl.removeEventListener('contextmenu', this._preventContext);
+        }
+        document.removeEventListener('touchmove', this._boundTouchMove);
+        document.removeEventListener('touchend', this._boundTouchEnd);
+        document.removeEventListener('touchcancel', this._boundTouchCancel);
+        this.cb.onDragEnd();
+        this._resetTouchState();
+    }
+
     _onTouchEnd(e) {
         var ts = this._touchState;
         document.removeEventListener('touchmove', this._boundTouchMove);
         document.removeEventListener('touchend', this._boundTouchEnd);
+        document.removeEventListener('touchcancel', this._boundTouchCancel); // ★ 추가
         if (ts.sourceEl) ts.sourceEl.removeEventListener('contextmenu', this._preventContext);
 
         if (!ts.isDragging) { this._cancelTouch(); return; }
@@ -415,10 +436,13 @@ class TaskNodeRenderer {
         }
         document.removeEventListener('touchmove', this._boundTouchMove);
         document.removeEventListener('touchend', this._boundTouchEnd);
+        document.removeEventListener('touchcancel', this._boundTouchCancel); // ★ 추가
         this._resetTouchState();
     }
 
     _resetTouchState() {
+        // ★ 추가: 어떤 경로로든 남은 고스트 강제 제거 ★
+        document.querySelectorAll('.touch-drag-ghost').forEach(function (el) { el.remove(); });
         document.querySelectorAll('.drop-above, .drop-below, .drop-inside, .drop-invalid, .drag-over-top, .drag-over-column').forEach(function (el) {
             el.classList.remove('drop-above', 'drop-below', 'drop-inside', 'drop-invalid', 'drag-over-top', 'drag-over-column');
         });

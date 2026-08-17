@@ -151,6 +151,7 @@ class BoardView {
         // ★★★ 연속 입력 중이었으면 입력창 복원 ★★★
         if (this._quickAddState) {
             var st = this._quickAddState;
+            this._quickAddState = null; // ★ 추가: 복원 실패 시 상태가 남아 매 렌더링마다 재시도하는 것 방지
             if (st.type === 'column') {
                 this._attachQuickInput('column', st.status, null, null);
             } else if (st.type === 'child') {
@@ -255,6 +256,7 @@ class BoardView {
                         newTask = self.ds.addTask(val, status, parentId);
                         if (newTask && self._quickAddState) {
                             self._quickAddState.anchorTaskId = newTask.Id;
+                            self.render(); // ★ 추가: 입력창이 새 항목 아래에 오도록 재정렬
                         }
                     }
                 } else {
@@ -273,7 +275,17 @@ class BoardView {
 
         input.addEventListener('blur', function () {
             setTimeout(function () {
-                if (self._quickAddId !== myId) return;
+                if (self._quickAddId !== myId) {
+                    // ★ 수정: 다른 입력창으로 대체된 경우 — 입력값은 저장하고 내 DOM만 정리 (기존: 그냥 리턴해서 값 유실 + DOM 잔류)
+                    var v0 = input.value.trim();
+                    if (container.parentNode) container.remove();
+                    if (addBtn) addBtn.style.display = '';
+                    if (v0) {
+                        if (type === 'column') self.ds.addTask(v0, status, null);
+                        else self.ds.addTask(v0, status, parentId);
+                    }
+                    return;
+                }
                 var val = input.value.trim();
                 if (val) {
                     if (type === 'column') {
