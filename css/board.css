@@ -49,3 +49,12 @@
         max-height: none;
     }
 }
+
+@media (min-width: 768px) {
+    .board-column {
+        flex: 0 0 auto !important;
+        width: 320px !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }
+}
