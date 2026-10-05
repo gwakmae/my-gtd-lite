@@ -78,10 +78,25 @@ class BoardView {
         var container = document.getElementById('content-area');
         if (!container) return;
 
+        var columnScroll = new Map();
         var oldBoard = container.querySelector('.board-container');
         if (oldBoard) {
             this._savedScrollLeft = oldBoard.scrollLeft;
             this._savedScrollTop = oldBoard.scrollTop;
+
+            oldBoard.querySelectorAll('.board-column').forEach(function (col) {
+                var taskList = col.querySelector('.task-list');
+                if (!taskList) return;
+
+                var key = col.classList.contains('today-column')
+                    ? 'today'
+                    : 'status:' + col.dataset.status;
+
+                columnScroll.set(key, {
+                    left: taskList.scrollLeft,
+                    top: taskList.scrollTop
+                });
+            });
         }
 
         container.innerHTML = '';
@@ -91,6 +106,7 @@ class BoardView {
 
         var boardContainer = document.createElement('div');
         boardContainer.className = 'board-container';
+        boardContainer.dataset.restoringScroll = 'true';
 
         var todayTasks = this.ds.getTodayTasks();
         var todayCol = this._renderColumn('오늘 할 일', todayTasks, null, true);
@@ -105,15 +121,6 @@ class BoardView {
         });
 
         container.appendChild(boardContainer);
-
-        var savedScrollX = this._savedScrollLeft;
-        var savedScrollY = this._savedScrollTop;
-        if (savedScrollX > 0 || savedScrollY > 0) {
-            requestAnimationFrame(function () {
-                if (savedScrollX > 0) boardContainer.scrollLeft = savedScrollX;
-                if (savedScrollY > 0) boardContainer.scrollTop = savedScrollY;
-            });
-        }
 
         var bulkBar = this._renderBulkBar();
         if (bulkBar) container.appendChild(bulkBar);
@@ -133,6 +140,23 @@ class BoardView {
                 this._attachQuickInput('sibling', st.status, st.parentId, st.anchorTaskId);
             }
         }
+
+        boardContainer.querySelectorAll('.board-column').forEach(function (col) {
+            var key = col.classList.contains('today-column')
+                ? 'today'
+                : 'status:' + col.dataset.status;
+            var saved = columnScroll.get(key);
+            var taskList = col.querySelector('.task-list');
+
+            if (!saved || !taskList) return;
+
+            taskList.scrollLeft = saved.left;
+            taskList.scrollTop = saved.top;
+        });
+
+        boardContainer.scrollLeft = this._savedScrollLeft;
+        boardContainer.scrollTop = this._savedScrollTop;
+        delete boardContainer.dataset.restoringScroll;
     }
 
     // ★★★ 통합된 입력창 생성/부착 메서드 ★★★
@@ -195,17 +219,74 @@ class BoardView {
             anchorEl.parentNode.insertBefore(container, anchorEl.nextSibling);
         }
 
+        if (type === 'child' || type === 'sibling') {
+            var referenceNode = type === 'child' ? nodeEl : anchorEl;
+            var referenceRow = referenceNode
+                ? referenceNode.querySelector(':scope > .task-node-self')
+                : null;
+            var referenceTitle = referenceRow
+                ? referenceRow.querySelector('.task-title')
+                : null;
+
+            if (referenceTitle) {
+                var titleStyle = getComputedStyle(referenceTitle);
+                var inputStyle = getComputedStyle(input);
+                var titleTextLeft = referenceTitle.getBoundingClientRect().left
+                    + (parseFloat(titleStyle.borderLeftWidth) || 0)
+                    + (parseFloat(titleStyle.paddingLeft) || 0);
+                var containerLeft = container.getBoundingClientRect().left;
+                var targetTextLeft = type === 'child'
+                    ? containerLeft + titleTextLeft
+                        - referenceRow.getBoundingClientRect().left
+                    : titleTextLeft;
+                var inputTextInset =
+                    (parseFloat(inputStyle.borderLeftWidth) || 0)
+                    + (parseFloat(inputStyle.paddingLeft) || 0);
+
+                container.style.paddingLeft = Math.max(
+                    0,
+                    targetTextLeft - containerLeft - inputTextInset
+                ) + 'px';
+            }
+        }
+
         // 스크롤 보정 & 포커스
         var boardContainer = container.closest('.board-container');
-        var savedScrollLeft = boardContainer ? boardContainer.scrollLeft : 0;
-        var savedScrollTop = boardContainer ? boardContainer.scrollTop : 0;
 
-        input.focus();
+        input.focus({ preventScroll: true });
 
-        if (boardContainer) {
-            requestAnimationFrame(function () {
-                boardContainer.scrollLeft = savedScrollLeft;
-                boardContainer.scrollTop = savedScrollTop;
+        if (boardContainer &&
+            boardContainer.dataset.restoringScroll !== 'true') {
+            var scrollContainers = [
+                container.closest('.task-list'),
+                boardContainer
+            ];
+
+            scrollContainers.forEach(function (scrollEl) {
+                if (!scrollEl) return;
+
+                var viewport = scrollEl.getBoundingClientRect();
+                var inputRect = input.getBoundingClientRect();
+                var left = viewport.left + scrollEl.clientLeft;
+                var top = viewport.top + scrollEl.clientTop;
+                var right = left + scrollEl.clientWidth;
+                var bottom = top + scrollEl.clientHeight;
+
+                if (scrollEl.scrollWidth > scrollEl.clientWidth) {
+                    if (inputRect.left < left) {
+                        scrollEl.scrollLeft += inputRect.left - left;
+                    } else if (inputRect.right > right) {
+                        scrollEl.scrollLeft += inputRect.right - right;
+                    }
+                }
+
+                if (scrollEl.scrollHeight > scrollEl.clientHeight) {
+                    if (inputRect.top < top) {
+                        scrollEl.scrollTop += inputRect.top - top;
+                    } else if (inputRect.bottom > bottom) {
+                        scrollEl.scrollTop += inputRect.bottom - bottom;
+                    }
+                }
             });
         }
 
