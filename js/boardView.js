@@ -224,29 +224,66 @@ class BoardView {
             var referenceRow = referenceNode
                 ? referenceNode.querySelector(':scope > .task-node-self')
                 : null;
-            var referenceTitle = referenceRow
-                ? referenceRow.querySelector('.task-title')
-                : null;
 
-            if (referenceTitle) {
-                var titleStyle = getComputedStyle(referenceTitle);
-                var inputStyle = getComputedStyle(input);
-                var titleTextLeft = referenceTitle.getBoundingClientRect().left
-                    + (parseFloat(titleStyle.borderLeftWidth) || 0)
-                    + (parseFloat(titleStyle.paddingLeft) || 0);
-                var containerLeft = container.getBoundingClientRect().left;
-                var targetTextLeft = type === 'child'
-                    ? containerLeft + titleTextLeft
-                        - referenceRow.getBoundingClientRect().left
-                    : titleTextLeft;
-                var inputTextInset =
-                    (parseFloat(inputStyle.borderLeftWidth) || 0)
-                    + (parseFloat(inputStyle.paddingLeft) || 0);
+            if (referenceRow && container.parentNode) {
+                var measureRow = referenceRow.cloneNode(true);
+                measureRow.className = 'task-node-self';
+                measureRow.removeAttribute('data-task-id');
+                measureRow.removeAttribute('draggable');
+                measureRow.setAttribute('aria-hidden', 'true');
+                measureRow.setAttribute('inert', '');
+                measureRow.style.visibility = 'hidden';
+                measureRow.style.pointerEvents = 'none';
 
-                container.style.paddingLeft = Math.max(
-                    0,
-                    targetTextLeft - containerLeft - inputTextInset
-                ) + 'px';
+                var measureCard = measureRow.querySelector('.task-card-content');
+                var measureTitle = measureRow.querySelector('.task-title');
+
+                if (measureCard && measureTitle) {
+                    measureCard.className = 'task-card-content';
+                    measureTitle.textContent = '';
+
+                    container.parentNode.insertBefore(measureRow, container);
+
+                    try {
+                        var cardRect = measureCard.getBoundingClientRect();
+                        var titleRect = measureTitle.getBoundingClientRect();
+                        var titleStyle = getComputedStyle(measureTitle);
+
+                        var titleTextLeft = titleRect.left
+                            + (parseFloat(titleStyle.borderLeftWidth) || 0)
+                            + (parseFloat(titleStyle.paddingLeft) || 0);
+
+                        container.style.padding = '0';
+
+                        var containerRect = container.getBoundingClientRect();
+
+                        container.style.paddingLeft = Math.max(
+                            0,
+                            cardRect.left - containerRect.left
+                        ) + 'px';
+
+                        container.style.paddingRight = Math.max(
+                            0,
+                            containerRect.right - cardRect.right
+                        ) + 'px';
+
+                        input.style.fontFamily = titleStyle.fontFamily;
+                        input.style.fontSize = titleStyle.fontSize;
+                        input.style.fontWeight = titleStyle.fontWeight;
+                        input.style.lineHeight = titleStyle.lineHeight;
+
+                        var inputStyle = getComputedStyle(input);
+                        var inputBorderLeft =
+                            parseFloat(inputStyle.borderLeftWidth) || 0;
+
+                        input.style.paddingLeft = Math.max(
+                            0,
+                            titleTextLeft - cardRect.left - inputBorderLeft
+                        ) + 'px';
+                    } finally {
+                        measureRow.remove();
+                    }
+                }
             }
         }
 
